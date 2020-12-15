@@ -1,8 +1,33 @@
 export solve, count_states, odds
-import Base: vcat, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
-export       vcat, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
+import Base: vcat, size, foldl, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
+export       vcat, size, foldl, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
 
 using Lazy: @forward
+
+abstract type CellRun end
+
+struct EmptyCellRun
+    width::Int
+
+    function EmptyCellRun(width::Int)
+        (width < 0) && error("Cell run cannot have negative width")
+        new(width)
+    end
+end
+
+struct FullCellRun
+    width::Int
+
+    function FullCellRun(width::Int)
+        (width < 0) && error("Cell run cannot have negative width")
+        new(width)
+    end
+end
+
+width(run::T) where T <: CellRun = run.width
+Base.length(run::T) where T <: CellRun = width(run)
+
+T(gcol::GridCol) where T <: CellRun = T(length(gcol))
 
 function init_grid(problem::Problem)
     grid = Grid(undef, size(problem)...)
@@ -56,62 +81,91 @@ n(counter::ColStateCounter) = counter.n
 @forward ColStateCounter.cumul firstindex
 @forward ColStateCounter.cumul lastindex
 
+function Base.vcat(a::ColStateCounter, b::ColStateCounter)
+    (length(a) == 0) && return b
+    (length(b) == 0) && return a
+    a.cumul = vcat(n(b) .* cumul(a), n(a) .* cumul(b))
+    a.n *= n(b)
+    a
+end
+
+Base.vcat(counters::Vararg{ColStateCounter}) = Base.foldl(Base.vcat, counters, EmptyCellRun(0))
+
+function Base.vcat(a::ColStateCounter, b::FullCellRun)
+    (length(a) == 0) && return b
+    (length(b) == 0) && return a
+    a.cumul = vcat(cumul(a), n(a) .* ones(length(b)))
+    a
+end
+
+function Base.vcat(a::FullCellRun, b::ColStateCounter)
+    (length(a) == 0) && return b
+    (length(b) == 0) && return a
+    b.cumul = vcat(n(b) .* ones(length(a)), cumul(b))
+    b
+end
+
+function Base.vcat(a::ColStateCounter, b::EmptyCellRun)
+    (length(a) == 0) && return b
+    (length(b) == 0) && return a
+    a.cumul = vcat(cumul(a), zeros(length(b)))
+    a
+end
+
+function Base.vcat(a::EmptyCellRun, b::ColStateCounter)
+    (length(a) == 0) && return b
+    (length(b) == 0) && return a
+    b.cumul = vcat(zeros(length(a)), cumul(b))
+    b
+end
+
 function (Base.:+)(a::ColStateCounter, b::ColStateCounter)
     a.cumul .+= b.cumul
     a.n += b.n
     a
 end
 
-function (Base.:*)(a::ColStateCounter, b::ColStateCounter)
-    if (length(a) == 0)
-        return b
-    elseif (length(b) == 0)
-        return a
-    else
-        a.cumul = vcat(n(b) .* cumul(a), n(a) .* cumul(b))
-        a.n *= n(b)
-        return a
-    end
+function (Base.:*)(a::Union{T, ColStateCounter}, b::Union{T, ColStateCounter}) where T <: CellRun
+    Base.vcat(a, b)
 end
 
-odds(counter::ColStateCounter) = cumul(counter) ./ n(counter)
-
-Base.vcat(counters::Vararg{ColStateCounter}) = prod(counters)
+odds(counter::ColStateCounter) = @. cumul(counter) / n(counter)
 
 mutable struct GridStateCounter <: AbstractStateCounter
     rows::Array{ColStateCounter}
     cols::Array{ColStateCounter}
 end
 
+rows(counter::GridStateCounter) = counter.rows
+cols(counter::GridStateCounter) = counter.cols
+
 function GridStateCounter(problem::Problem)  # initializes based on problem description assuming grid is blank
     n, m = size(problem)
-    dummy_row = init_gcol(n)
-    row_counters = map(i -> count_states(dummy_row, rows(problem)[i]), 1:n)
-    dummy_col = init_gcol(m)
-    col_counters = map(j -> count_states(dummy_col, cols(problem)[j]), 1:m)
-    GridStateCounter(row_counters, col_counters)
+    dummy_row = init_gcol(m)
+    dummy_col = init_gcol(n)
+    GridStateCounter(
+        map(i -> count_states(dummy_row, rows(problem)[i]), 1:n)
+        map(j -> count_states(dummy_col, cols(problem)[j]), 1:m))  # TODO: redo with views
 end
 
 function GridStateCounter(grid::Grid, problem::Problem)  # initializes based on problem description and current state of grid
-    row_counters = map(i -> count_states(grid[i,:], rows(problem)[i]), 1:size(grid, 1))
-    col_counters = map(i -> count_states(grid[:,j], cols(problem)[j]), 1:size(grid, 2))
-    GridStateCounter(row_counters, col_counters)
+    GridStateCounter(
+        map(i -> count_states(grid[i,:], rows(problem)[i]), 1:size(grid, 1))
+        map(i -> count_states(grid[:,j], cols(problem)[j]), 1:size(grid, 2)))  # TODO: redo with views
 end
 
 function GridStateCounter(n::Int, m::Int; init::String="blank")
-    row_counters = [ColStateCounter(m; init=init) for _=1:n]
-    col_counters = [ColStateCounter(n; init=init) for _=1:m]
-    GridStateCounter(row_counters, col_counters)
+    GridStateCounter(
+        [ColStateCounter(m; init=init) for _=1:n],
+        [ColStateCounter(n; init=init) for _=1:m])
 end
-
-rows(counter::GridStateCounter) = counter.rows
-cols(counter::GridStateCounter) = counter.cols
 
 Base.size(counter::GridStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("grid state counter has only two dimensions"))
 Base.size(counter::GridStateCounter) = (Base.size(counter, 1), Base.size(counter, 2))
 
 function odds_rowcol(x::T, y::T) where T <: AbstractFloat
-    ((x === 1.0) || (y === 1.0)) && return 1.0
+    (isone(x) || isone(y)) && return 1.0
+    (iszero(x) || iszero(y)) && return 0.0
     x * y
 end
 
@@ -125,7 +179,7 @@ function odds(counter::GridStateCounter)
     for j=1:m
         col_out_odds[:,j] .= cols(counter)[j] |> odds
     end
-    for (i,j)=eachindex(col_out_odds)
+    for (i,j)=eachindex(col_out_odds)  # TODO: vectorize
         col_out_odds[i,j] = odds_rowcol(row_odds[i,j], col_out_odds[i,j])  # reuse one of the arrays as the output
     end
     col_out_odds
@@ -293,8 +347,8 @@ end
 
 function update!(grid::Grid, counter::GridStateCounter)
     this_odds = odds(counter)
-    grid[findall(this_odds.===1.0)] .= true
-    grid[findall(this_odds.===0.0)] .= false
+    @. grid[isone(this_odds)] = true
+    @. grid[iszero(this_odds)] = false
     # return list of rows and cols which are now obsolete (and must be re-counted) as a result of the changes
 end
 
