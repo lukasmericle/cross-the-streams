@@ -2,17 +2,16 @@ export solve
 
 init_cmat(pzl::Puzzle) = init_cmat(size(pzl)...)
 
-function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
-    n, m = size(pzl)
-    dummy_row = init_cvec(m)
-    dummy_col = init_cvec(n)
-    MatrixStateCounter(map(i -> count_states(dummy_row, rows(pzl)[i]), 1:n),
-                       map(j -> count_states(dummy_col, cols(pzl)[j]), 1:m))  # TODO: redo with views
+@views function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
+    dummy_row = init_cvec(size(pzl, 2))
+    dummy_col = init_cvec(size(pzl, 1))
+    MatrixStateCounter(map(i -> count_states(dummy_row, rows(pzl)[i]), 1:size(pzl, 1)),
+                       map(j -> count_states(dummy_col, cols(pzl)[j]), 1:size(pzl, 2)))
 end
 
-function MatrixStateCounter(cmat::T, pzl::Puzzle) where T <: TwoDCellArray  # initializes based on puzzle description and current state of grid
+@views function MatrixStateCounter(cmat::T, pzl::Puzzle) where T <: TwoDCellArray  # initializes based on puzzle description and current state of grid
     MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(pzl)[i]), 1:size(cmat, 1)),
-                       map(i -> count_states(cmat[:,j], cols(pzl)[j]), 1:size(cmat, 2)))  # TODO: redo with views
+                       map(i -> count_states(cmat[:,j], cols(pzl)[j]), 1:size(cmat, 2)))
 end
 
 function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVector
@@ -129,7 +128,7 @@ end
         while cluevec_middle[1] <= max_len
 
             counter += count_states(cellvec, vcat(cluevec_before, cluevec_middle, cluevec_after))
-            cluevec_middle[1] += 1
+            cluevec_middle[1] += 1  # a question mark represents a cell run of length 1 or more
 
         end
 
@@ -184,7 +183,7 @@ function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
     @. cmat[isone(this_odds)] = true
     @. cmat[iszero(this_odds)] = false
 
-    updates = (cmat_copy .=== cmat)  # true where a missing flipped to true or false
+    updates = (cmat_copy .!== cmat)  # true where a missing flipped to true or false
 
     obsolete_row_idxs = findall(any.(eachrow(updates)))  # if any updates occur in a row, that row is obsolete
     obsolete_col_idxs = findall(any.(eachcol(updates)))
@@ -194,28 +193,38 @@ function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
 end
 
 function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
+
     obsolete_rowcols = update!(cmat, counter)
-    # while any(ismissing.(cmat))
-    while length(obsolete_rowcols) > 0  # this version ensures that the counter is fully updated
-        rowcol = popfirst!(obsolete_rowcols)
-        recount!(counter, cmat, pzl, rowcol)
-        new_obsolete_rowcols = update!(cmat, counter)
-        if length(new_obsolete_rowcols) > 0
-            append!(obsolete_rowcols, new_obsolete_rowcols)
-            # filter(rc -> (((rc[1] === 'R') && any(ismissing.(@view cmat[rc[2],:])))
-            #            || ((rc[1] === 'C') && any(ismissing.(@view cmat[:,rc[2]])))),
-            #        obsolete_rowcols)
-            filter(rc -> (((rc[1] === 'R') && (n(rows(counter)[rc[2]]) > 1))
-                    || ((rc[1] === 'C') && (n(cols(counter)[rc[2]]) > 1))),
-            obsolete_rowcols)  # this version ensures that the counter is fully updated
-            unique!(obsolete_rowcols)
+
+    while (complexity(counter) > 1)
+
+        if length(obsolete_rowcols) > 0
+
+            rowcol = popfirst!(obsolete_rowcols)
+            recount!(counter, cmat, pzl, rowcol)
+
+            new_obsolete_rowcols = update!(cmat, counter)
+            if length(new_obsolete_rowcols) > 0
+                append!(obsolete_rowcols, new_obsolete_rowcols)
+                unique!(obsolete_rowcols)
+            end
+
+            filter!(rc -> (((rc[1] === 'R') && (n(rows(counter)[rc[2]]) > 1))
+                        || ((rc[1] === 'C') && (n(cols(counter)[rc[2]]) > 1))),
+                    obsolete_rowcols)
+
         else
-            # we reach this branch if the puzzle remains ambiguous in its current state;
-            # this means we need to make a guess for the next step and backtrack if we encounter any inconsistencies
-            break # if we break early, does the convert() call below throw an error?
+
+            # if we're out of ideas, we make a best guess and backtrack if it didn't work
+            # TODO: implement backtracking exploration
+            break
+
         end
+
     end
+
     convert(SolutionCellMatrix, cmat)
+
 end
 
 solve(pzl::Puzzle) = solve(pzl, init_cmat(pzl), MatrixStateCounter(pzl))

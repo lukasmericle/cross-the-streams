@@ -31,7 +31,7 @@ GOLDEN_RATIO = (sqrt(5) + 1) / 2
 BASE_COEFF = 1 / GOLDEN_RATIO
 
 KERNEL_WIDTH_COEFF = BASE_COEFF ^ (1 - log1p(666e-4))
-make_kernel(smat::T) where T<:TwoDSolutionCellArray = construct_gaussian_kernel(sqrt(prod(size(smat))) ^ KERNEL_WIDTH_COEFF)
+make_kernel(smat::T) where T <: TwoDSolutionCellArray = construct_gaussian_kernel(sqrt(prod(size(smat))) ^ KERNEL_WIDTH_COEFF)
 
 NEXT_SITE_COEFF = BASE_COEFF ^ (1 + log(666e-2))
 @views function choose_next_site(smat::TC, kernel::Array{TK, 2}, ijs::Array{TwoDCoord}) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
