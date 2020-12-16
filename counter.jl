@@ -1,6 +1,6 @@
 export VectorStateCounter, MatrixStateCounter
-import Base: vcat, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
-export       vcat
+import Base: vcat, isnan, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
+export       vcat, isnan, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
 
 using Lazy: @forward
 
@@ -29,7 +29,7 @@ function VectorStateCounter(m::Int; init::String="blank")
     VectorStateCounter(cumul, n)
 end
 
-VectorStateCounter() = VectorStateCounter(0; init="blank")
+VectorStateCounter() = NaN
 VectorStateCounter(cvec::T; init::String="blank") where T <: OneDCellArray = VectorStateCounter(length(cvec); init=init)
 
 cumul(counter::VectorStateCounter) = counter.cumul
@@ -51,18 +51,22 @@ function Base.vcat(a::VectorStateCounter, b::VectorStateCounter)
     a.n *= n(b)
     a
 end
-
-Base.vcat(counters::Vararg{VectorStateCounter}) = prod(counters)
+Base.vcat(a::VectorStateCounter, b::T) where T <: AbstractFloat = isnan(b) ? b : error("cannot concatenate a state counter and a float")
+Base.vcat(b::T, a::VectorStateCounter) where T <: AbstractFloat = Base.vcat(a, b)
 
 function (Base.:+)(a::VectorStateCounter, b::VectorStateCounter)
     a.cumul .+= b.cumul
     a.n += b.n
     a
 end
+(Base.:+)(a::VectorStateCounter, b::T) where T <: AbstractFloat = isnan(b) ? a : error("cannot add a state counter and a float")  # just ignores the NaN
+(Base.:+)(b::T, a::VectorStateCounter) where T <: AbstractFloat = a + b
 
-function (Base.:*)(a::VectorStateCounter, b::VectorStateCounter)
-    Base.vcat(a, b)
-end
+(Base.:*)(a::Union{T, VectorStateCounter}, b::Union{T, VectorStateCounter}) where T <: AbstractFloat = Base.vcat(a, b)
+
+Base.vcat(counters::Vararg{VectorStateCounter}) = prod(counters)
+
+Base.isnan(counter::VectorStateCounter) = false
 
 mutable struct MatrixStateCounter <: AbstractStateCounter
     rows::Vector{VectorStateCounter}

@@ -47,7 +47,7 @@ end
 
     if (length(cluevec) == 0)
         if any(skipmissing(cellvec))
-            return VectorStateCounter(cellvec; init="blank")  # if any trues but no col description, bound this branch
+            return NaN  # if any trues but no col description, bound this branch
         else
             return VectorStateCounter(cellvec; init="empty")  # if no trues, no-op
         end
@@ -60,7 +60,7 @@ end
     n_reqd_cells = minreq_cells(cluevec[all_ints], length(all_qmks))
 
     if (n_reqd_cells > length(cellvec))
-        return VectorStateCounter(cellvec; init="blank")  # if the col description won't fit into the grid, bound this branch
+        return NaN  # if the col description won't fit into the grid, bound this branch
     elseif (length(cellvec) === 0)
         return VectorStateCounter(cellvec; init="empty")  # reach this branch if (length(cellvec) == 0) and col has only Asterisk in it; no-op
     end
@@ -96,7 +96,7 @@ end
                 istrue(cellvec[pos-1]) && continue  # continue if empty cell should be filled
                 cellvec_before = cellvec[1:pos-2]
                 counter_before = count_states(cellvec_before, cluevec_before) * VectorStateCounter(1; init="empty")
-                (n(counter_before) === 0) && continue
+                (isnan(counter_before) || (n(counter_before) === 0)) && continue
             end
 
             if pos == last_pos_apriori
@@ -105,7 +105,7 @@ end
                 istrue(cellvec[pos+(run_length-1)+1]) && continue  # continue if empty cell should be filled
                 cellvec_after = cellvec[pos+(run_length-1)+2:end]
                 counter_after = VectorStateCounter(1; init="empty") * count_states(cellvec_after, cluevec_after)
-                (n(counter_after) === 0) && continue
+                (isnan(counter_after) || (n(counter_after) === 0)) && continue
             end
 
             counter += counter_before * counter_middle * counter_after
@@ -156,21 +156,33 @@ end
 end
 
 function recount!(counter::VectorStateCounter, cellvec::T, cluevec::S) where {T <: OneDCellArray,  S <: AbstractClueVector}
+
     new_counter = count_states(cellvec, cluevec)
+    isnan(new_counter) && error("No valid states found during recount")
+
     counter.cumul[:] .= new_counter.cumul
     counter.n = new_counter.n
+
 end
 
 @views function recount!(counter::MatrixStateCounter, cmat::T, pzl::Puzzle, rowcol::Tuple{Char, Int}) where {T <: TwoDCellArray}
+
     if rowcol[1] === 'R'
+
         i = rowcol[2]
         recount!(rows(counter)[i], cmat[i,:], rows(pzl)[i])
+
     elseif rowcol[1] === 'C'
+
         j = rowcol[2]
         recount!(cols(counter)[j], cmat[:,j], cols(pzl)[j])
+
     else
+
         error("rowcol must either refer to row ('R') or col ('C')")
+
     end
+
 end
 
 function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
