@@ -14,7 +14,7 @@ function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVecto
     n_reqd_cells
 end
 
-function space_for_ints(cluevec_ints_after::Array{Int})
+function space_for_ints(cluevec_ints_after::T) where T <: AbstractClueVector
     (length(cluevec_ints_after) == 0) && return 0
     sum(cluevec_ints_after) + length(cluevec_ints_after)
 end
@@ -61,7 +61,7 @@ end
         run_length = cluevec[first_int]
         cluevec_after = cluevec[first_int+1:end]
 
-        space_for_ints_after = space_for_ints(convert(Array{Int}, cluevec[all_ints[2:end]]))
+        space_for_ints_after = space_for_ints(cluevec[all_ints[2:end]])
         space_for_qmks_before, space_for_qmks_after = space_for_qmks(all_qmks, first_int)
 
         last_pos_apriori = length(cellvec) - (run_length - 1)
