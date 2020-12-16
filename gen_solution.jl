@@ -1,6 +1,4 @@
 export generate_solution
-import Base: string
-export       string
 
 using StatsBase: sample, Weights
 using Statistics: mean

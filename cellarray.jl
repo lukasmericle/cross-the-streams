@@ -1,9 +1,17 @@
-export CellVector, SolutionCellVector, CellMatrix, SolutionCellMatrix
-export empty_neighbor_sites, iscrowded, inbounds
+export CellState, CellVector, SolutionCellVector, CellMatrix, SolutionCellMatrix
+export init_cmat, init_cvec
+export empty_neighbor_sites
 import Base: string
 export       string
 
 using Lazy: @forward
+
+CellState = Union{Bool, Missing}
+
+istrue(x::CellState) = !ismissing(x) && x
+isfalse(x::CellState) = !ismissing(x) && !x
+isfilled(x::CellState) = istrue(x)
+isempty(x::CellState) = !isfilled(x)
 
 CellVector = Vector{CellState}
 SolutionCellVector = Vector{Bool}
@@ -32,6 +40,18 @@ TwoDCoord = Tuple{Int,Int}
 
 VON_NEUMANN_NEIGHBORHOOD_1D = [-1, 1]
 VON_NEUMANN_NEIGHBORHOOD_2D = [(0,-1), (-1,0), (1,0), (0,1)]
+
+function init_cmat(pzl::Puzzle)
+    cmat = CellMatrix(undef, size(pzl)...)
+    fill!(cmat, missing)
+    cmat
+end
+
+function init_cvec(n::Int)
+    cvec = CellVector(undef, n)
+    fill!(cvec, missing)
+    cvec
+end
 
 string_vec(cvec::T) where T <: OneDAbstractCellArray = prod(map(x -> (ismissing(x) ? "><" : (x ? "██" : "  ")),  cvec))
 

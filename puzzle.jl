@@ -1,10 +1,18 @@
-export ClueVector
+export QuestionMark, Asterisk, Clue, ClueVector
 export Puzzle
 export rows, cols
+export complexity
 import Base: size, string
 export       size, string
 
-using Lazy: @forward
+struct QuestionMark end
+struct Asterisk end
+
+Clue = Union{T, QuestionMark, Asterisk} where T <: Int
+ClueRepr = Union{T, String} where T <: Int
+
+Base.string(n::QuestionMark) = "?"
+Base.string(n::Asterisk) = "*"
 
 ClueVector = Array{Clue, 1}
 ClueVectorView = SubArray{Clue, 1, ClueVector}
@@ -36,4 +44,9 @@ function Base.string(pzl::Puzzle)
     s *= join(string.(rows(pzl)), "\n") * "\n"
     s *= join(string.(cols(pzl)), "\n")
     s
+end
+
+function complexity(pzl::Puzzle)
+    counter = MatrixStateCounter(pzl)
+    prod(convert.(BigInt, map(n, rows(counter)))) * prod(convert.(BigInt, map(n, cols(counter))))
 end
