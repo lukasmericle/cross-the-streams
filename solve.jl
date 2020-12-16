@@ -108,9 +108,7 @@ end
                 (n(counter_after) === 0) && continue
             end
 
-            counter += vcat(counter_before,
-                            counter_middle,
-                            counter_after)
+            counter += counter_before * counter_middle * counter_after
 
         end
 

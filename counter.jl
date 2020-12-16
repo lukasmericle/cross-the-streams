@@ -52,7 +52,7 @@ function Base.vcat(a::VectorStateCounter, b::VectorStateCounter)
     a
 end
 
-Base.vcat(counters::Vararg{VectorStateCounter}) = Base.foldl(Base.vcat, counters, init=VectorStateCounter(0; init="empty"))
+Base.vcat(counters::Vararg{VectorStateCounter}) = prod(counters)
 
 function (Base.:+)(a::VectorStateCounter, b::VectorStateCounter)
     a.cumul .+= b.cumul
@@ -101,11 +101,7 @@ function odds(counter::MatrixStateCounter)
     mapslices(odds_rowcol, omat, dims=[1])[1,:,:]
 end
 
-function entropy(p::T) where T <: AbstractFloat
-    (isone(p) || iszero(p)) && return 0.0
-    (p * log(p)) + ((1 - p) * log(1 - p))
-end
-
+entropy(p::T) where T <: AbstractFloat = (isone(p) || iszero(p)) ? 0.0 : -(p * log(p) + (1 - p) * log(1 - p))
 entropy(counter::T) where T <: AbstractStateCounter = mean(entropy.(odds(counter)))
 
 complexity(counter::VectorStateCounter) = n(counter)
