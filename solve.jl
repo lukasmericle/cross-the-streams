@@ -298,8 +298,8 @@ function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
     @. cmat[isone(this_odds)] = true
     @. cmat[iszero(this_odds)] = false
     updates = (cmat_copy .=== cmat)  # true where a missing flipped to true or false
-    obsolete_rows = filter(r -> any(ismissing.(@view cmat[r,:])), findall(any.(eachrow(updates))))  # if any updates occur in a row, that row is obsolete, unless our cmat is already fully determined on that row
-    obsolete_cols = filter(c -> any(ismissing.(@view cmat[:,c])), findall(any.(eachcol(updates))))
+    obsolete_rows = findall(any.(eachrow(updates)))  # if any updates occur in a row, that row is obsolete
+    obsolete_cols = findall(any.(eachcol(updates)))
     vcat(map(r -> ('R', r), obsolete_rows), map(c -> ('C', c), obsolete_cols))
 end
 
@@ -311,7 +311,9 @@ function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: Two
         new_obsolete_rowcols = update!(cmat, counter)
         append!(obsolete_rowcols, new_obsolete_rowcols)
         unique!(obsolete_rowcols)
-        println(prod(convert.(BigInt, map(n, rows(counter)))) * prod(convert.(BigInt, map(n, cols(counter)))))
+        filter(rc -> (((rc[1] === 'R') && any(ismissing.(@view cmat[rc[2],:])))
+                   || ((rc[1] === 'C') && any(ismissing.(@view cmat[:,rc[2]])))),
+               obsolete_rowcols)
     end
     convert(SolutionCellMatrix, cmat)
 end
