@@ -162,27 +162,43 @@ end
 end
 
 function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
+
     this_odds = odds(counter)
     cmat_copy = copy(cmat)
+
     @. cmat[isone(this_odds)] = true
     @. cmat[iszero(this_odds)] = false
+
     updates = (cmat_copy .=== cmat)  # true where a missing flipped to true or false
-    obsolete_rows = findall(any.(eachrow(updates)))  # if any updates occur in a row, that row is obsolete
-    obsolete_cols = findall(any.(eachcol(updates)))
-    vcat(map(r -> ('R', r), obsolete_rows), map(c -> ('C', c), obsolete_cols))
+
+    obsolete_row_idxs = findall(any.(eachrow(updates)))  # if any updates occur in a row, that row is obsolete
+    obsolete_col_idxs = findall(any.(eachcol(updates)))
+
+    vcat(map(r -> ('R', r), obsolete_row_idxs), map(c -> ('C', c), obsolete_col_idxs))
+
 end
 
 function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
     obsolete_rowcols = update!(cmat, counter)
-    while any(ismissing.(cmat))
+    # while any(ismissing.(cmat))
+    while length(obsolete_rowcols) > 0  # this version ensures that the counter is fully updated
         rowcol = popfirst!(obsolete_rowcols)
         recount!(counter, cmat, pzl, rowcol)
         new_obsolete_rowcols = update!(cmat, counter)
-        append!(obsolete_rowcols, new_obsolete_rowcols)
-        filter(rc -> (((rc[1] === 'R') && any(ismissing.(@view cmat[rc[2],:])))
-                   || ((rc[1] === 'C') && any(ismissing.(@view cmat[:,rc[2]])))),
-               obsolete_rowcols)
-        unique!(obsolete_rowcols)
+        if length(new_obsolete_rowscols) > 0
+            append!(obsolete_rowcols, new_obsolete_rowcols)
+            # filter(rc -> (((rc[1] === 'R') && any(ismissing.(@view cmat[rc[2],:])))
+            #            || ((rc[1] === 'C') && any(ismissing.(@view cmat[:,rc[2]])))),
+            #        obsolete_rowcols)
+            filter(rc -> (((rc[1] === 'R') && (n(rows(counter)[rc[2]]) > 1))
+                    || ((rc[1] === 'C') && (n(cols(counter)[rc[2]]) > 1))),
+            obsolete_rowcols)  # this version ensures that the counter is fully updated
+            unique!(obsolete_rowcols)
+        else
+            # we reach this branch if the puzzle remains ambiguous in its current state;
+            # this means we need to make a guess for the next step and backtrack if we encounter any inconsistencies
+            break # if we break early, does the convert() call below throw an error?
+        end
     end
     convert(SolutionCellMatrix, cmat)
 end

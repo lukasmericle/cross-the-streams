@@ -112,3 +112,14 @@ function odds(counter::MatrixStateCounter)
     end
     mapslices(odds_rowcol, omat, dims=[1])[1,:,:]
 end
+
+function entropy(p::T) where T <: AbstractFloat
+    (isone(p) || iszero(p)) && return 0.0
+    -p * log(p) - (1-p) * log(1-p)
+end
+
+entropy(counter::MatrixStateCounter) = entropy.(odds(counter))
+
+function hint(counter::MatrixStateCounter, cmat::T) where T <: TwoDCellArray
+    findmin()
+end
