@@ -99,6 +99,7 @@ function odds_rowcol(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
     any(isone.(xy)) && return 1.0
     any(iszero.(xy)) && return 0.0
     prod(xy)
+    # sqrt(prod(xy))  # perhaps the geometric mean is better for this application?
 end
 
 function odds(counter::MatrixStateCounter)
@@ -115,11 +116,7 @@ end
 
 function entropy(p::T) where T <: AbstractFloat
     (isone(p) || iszero(p)) && return 0.0
-    -p * log(p) - (1-p) * log(1-p)
+    p * log(p) + (1 - p) * log(1 - p)
 end
 
 entropy(counter::MatrixStateCounter) = entropy.(odds(counter))
-
-function hint(counter::MatrixStateCounter, cmat::T) where T <: TwoDCellArray
-    findmin()
-end
