@@ -20,9 +20,7 @@ end
             for v=1:k
                 jj = j + (v - 1) - kk
                 !inbounds(smat, jj, 2) && continue
-                if istrue(smat[ii, jj])
-                    c += kernel[u,v]
-                end
+                smat[ii, jj] && (c += kernel[u,v])
             end
         end
     end

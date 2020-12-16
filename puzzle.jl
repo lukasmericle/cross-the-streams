@@ -46,7 +46,4 @@ function Base.string(pzl::Puzzle)
     s
 end
 
-function complexity(pzl::Puzzle)
-    counter = MatrixStateCounter(pzl)
-    prod(convert.(BigInt, map(n, rows(counter)))) * prod(convert.(BigInt, map(n, cols(counter))))
-end
+complexity(pzl::Puzzle) = complexity(MatrixStateCounter(pzl))

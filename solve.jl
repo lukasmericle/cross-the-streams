@@ -1,5 +1,20 @@
 export solve
 
+init_cmat(pzl::Puzzle) = init_cmat(size(pzl)...)
+
+function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
+    n, m = size(pzl)
+    dummy_row = init_cvec(m)
+    dummy_col = init_cvec(n)
+    MatrixStateCounter(map(i -> count_states(dummy_row, rows(pzl)[i]), 1:n),
+                       map(j -> count_states(dummy_col, cols(pzl)[j]), 1:m))  # TODO: redo with views
+end
+
+function MatrixStateCounter(cmat::T, pzl::Puzzle) where T <: TwoDCellArray  # initializes based on puzzle description and current state of grid
+    MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(pzl)[i]), 1:size(cmat, 1)),
+                       map(i -> count_states(cmat[:,j], cols(pzl)[j]), 1:size(cmat, 2)))  # TODO: redo with views
+end
+
 function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVector
     n_reqd_cells = 0
     if length(cluevec_ints) > 0
@@ -185,7 +200,7 @@ function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: Two
         rowcol = popfirst!(obsolete_rowcols)
         recount!(counter, cmat, pzl, rowcol)
         new_obsolete_rowcols = update!(cmat, counter)
-        if length(new_obsolete_rowscols) > 0
+        if length(new_obsolete_rowcols) > 0
             append!(obsolete_rowcols, new_obsolete_rowcols)
             # filter(rc -> (((rc[1] === 'R') && any(ismissing.(@view cmat[rc[2],:])))
             #            || ((rc[1] === 'C') && any(ismissing.(@view cmat[:,rc[2]])))),

@@ -64,8 +64,6 @@ function (Base.:*)(a::VectorStateCounter, b::VectorStateCounter)
     Base.vcat(a, b)
 end
 
-odds(counter::VectorStateCounter) = cumul(counter) ./ n(counter)
-
 mutable struct MatrixStateCounter <: AbstractStateCounter
     rows::Vector{VectorStateCounter}
     cols::Vector{VectorStateCounter}
@@ -73,19 +71,6 @@ end
 
 rows(counter::MatrixStateCounter) = counter.rows
 cols(counter::MatrixStateCounter) = counter.cols
-
-function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
-    n, m = size(pzl)
-    dummy_row = init_cvec(m)
-    dummy_col = init_cvec(n)
-    MatrixStateCounter(map(i -> count_states(dummy_row, rows(pzl)[i]), 1:n),
-                       map(j -> count_states(dummy_col, cols(pzl)[j]), 1:m))  # TODO: redo with views
-end
-
-function MatrixStateCounter(cmat::T, pzl::Puzzle) where T <: TwoDCellArray  # initializes based on puzzle description and current state of grid
-    MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(pzl)[i]), 1:size(cmat, 1)),
-                       map(i -> count_states(cmat[:,j], cols(pzl)[j]), 1:size(cmat, 2)))  # TODO: redo with views
-end
 
 function MatrixStateCounter(n::Int, m::Int; init::String="blank")
     MatrixStateCounter([VectorStateCounter(m; init=init) for _=1:n],
@@ -102,6 +87,8 @@ function odds_rowcol(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
     # sqrt(prod(xy))  # perhaps the geometric mean is better for this application?
 end
 
+odds(counter::VectorStateCounter) = cumul(counter) ./ n(counter)
+
 function odds(counter::MatrixStateCounter)
     n, m = size(counter)
     omat = Array{Float64}(undef, 2, n, m)
@@ -116,7 +103,10 @@ end
 
 function entropy(p::T) where T <: AbstractFloat
     (isone(p) || iszero(p)) && return 0.0
-    p * log(p) + (1 - p) * log(1 - p)
+    (p * log(p)) + ((1 - p) * log(1 - p))
 end
 
-entropy(counter::MatrixStateCounter) = entropy.(odds(counter))
+entropy(counter::T) where T <: AbstractStateCounter = mean(entropy.(odds(counter)))
+
+complexity(counter::VectorStateCounter) = n(counter)
+complexity(counter::MatrixStateCounter) = prod(convert.(BigInt, map(n, rows(counter)))) * prod(convert.(BigInt, map(n, cols(counter))))

@@ -41,8 +41,8 @@ TwoDCoord = Tuple{Int,Int}
 VON_NEUMANN_NEIGHBORHOOD_1D = [-1, 1]
 VON_NEUMANN_NEIGHBORHOOD_2D = [(0,-1), (-1,0), (1,0), (0,1)]
 
-function init_cmat(pzl::Puzzle)
-    cmat = CellMatrix(undef, size(pzl)...)
+function init_cmat(n::Int, m::Int)
+    cmat = CellMatrix(undef, n, m)
     fill!(cmat, missing)
     cmat
 end
