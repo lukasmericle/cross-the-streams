@@ -16,13 +16,11 @@ end
 
 function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVector
     n_reqd_cells = 0
-    if length(cluevec_ints) > 0
+    if (length(cluevec_ints) > 0)
         n_reqd_cells += sum(cluevec_ints) + (length(cluevec_ints) - 1)  # sum + (num - 1)
     end
-    if n_qmks > 0
-        if n_reqd_cells > 0
-            n_reqd_cells += 1  # add one extra for a gap between seq of ints and seq of qmks
-        end
+    if (n_qmks > 0)
+        (n_reqd_cells > 0) && (n_reqd_cells += 1)  # add one extra for a gap between seq of ints and seq of qmks
         n_reqd_cells += 2 * n_qmks - 1  # sum + (num - 1), assuming all ?s represent length-1 runs
     end
     n_reqd_cells
@@ -67,7 +65,7 @@ end
 
     counter = VectorStateCounter(cellvec; init="blank")
 
-    if length(all_ints) > 0
+    if (length(all_ints) > 0)
 
         first_int = all_ints[1]
 
@@ -90,7 +88,7 @@ end
             any(isfalse.(cellvec_middle)) && continue  # continue if filled cell should be empty
             counter_middle = VectorStateCounter(cellvec_middle; init="full")
 
-            if pos == 1
+            if (pos == 1)
                 counter_before = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos-1]) && continue  # continue if empty cell should be filled
@@ -99,7 +97,7 @@ end
                 (isnan(counter_before) || (n(counter_before) === 0)) && continue
             end
 
-            if pos == last_pos_apriori
+            if (pos == last_pos_apriori)
                 counter_after = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos+(run_length-1)+1]) && continue  # continue if empty cell should be filled
@@ -108,11 +106,11 @@ end
                 (isnan(counter_after) || (n(counter_after) === 0)) && continue
             end
 
-            counter += counter_before * counter_middle * counter_after
+            counter += vcat(counter_before, counter_middle, counter_after)
 
         end
 
-    elseif length(all_qmks) > 0
+    elseif (length(all_qmks) > 0)
 
         first_qmk = all_qmks[1]
 
@@ -123,14 +121,14 @@ end
         cluevec_middle = [1]
         cluevec_after = cluevec[first_qmk+1:end]
 
-        while cluevec_middle[1] <= max_len
+        while (cluevec_middle[1] <= max_len)
 
             counter += count_states(cellvec, vcat(cluevec_before, cluevec_middle, cluevec_after))
             cluevec_middle[1] += 1  # a question mark represents a cell run of length 1 or more
 
         end
 
-    elseif length(all_asks) > 0
+    elseif (length(all_asks) > 0)
 
         all(ismissing.(cellvec)) && return VectorStateCounter(cellvec; init="askmissing")
         all(istrue.(cellvec)) && return VectorStateCounter(cellvec; init="full")
@@ -142,7 +140,7 @@ end
         cluevec_middle = QuestionMark[]
         cluevec_after = cluevec[first_ask+1:end]
 
-        while (2 * length(cluevec_middle) - 1) <= length(cellvec)
+        while ((2 * length(cluevec_middle) - 1) <= length(cellvec))
 
             counter += count_states(cellvec, vcat(cluevec_before, cluevec_middle, cluevec_after))
             push!(cluevec_middle, QuestionMark())  # an asterisk represents a sequence of question marks of length 0 or more
@@ -155,7 +153,7 @@ end
 
 end
 
-function recount!(counter::VectorStateCounter, cellvec::T, cluevec::S) where {T <: OneDCellArray,  S <: AbstractClueVector}
+@views function recount!(counter::VectorStateCounter, cellvec::T, cluevec::S) where {T <: OneDCellArray,  S <: AbstractClueVector}
 
     new_counter = count_states(cellvec, cluevec)
     isnan(new_counter) && error("No valid states found during recount")
@@ -167,12 +165,12 @@ end
 
 @views function recount!(counter::MatrixStateCounter, cmat::T, pzl::Puzzle, rowcol::Tuple{Char, Int}) where {T <: TwoDCellArray}
 
-    if rowcol[1] === 'R'
+    if (rowcol[1] === 'R')
 
         i = rowcol[2]
         recount!(rows(counter)[i], cmat[i,:], rows(pzl)[i])
 
-    elseif rowcol[1] === 'C'
+    elseif (rowcol[1] === 'C')
 
         j = rowcol[2]
         recount!(cols(counter)[j], cmat[:,j], cols(pzl)[j])
@@ -185,7 +183,7 @@ end
 
 end
 
-function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
+@views function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
 
     this_odds = odds(counter)
     cmat_copy = copy(cmat)
@@ -208,13 +206,13 @@ function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: Two
 
     while (complexity(counter) > 1)
 
-        if length(obsolete_rowcols) > 0
+        if (length(obsolete_rowcols) > 0)
 
             rowcol = popfirst!(obsolete_rowcols)
             recount!(counter, cmat, pzl, rowcol)
 
             new_obsolete_rowcols = update!(cmat, counter)
-            if length(new_obsolete_rowcols) > 0
+            if (length(new_obsolete_rowcols) > 0)
                 append!(obsolete_rowcols, new_obsolete_rowcols)
                 unique!(obsolete_rowcols)
             end

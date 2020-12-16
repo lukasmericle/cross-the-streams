@@ -93,6 +93,6 @@ end
 
 @views function empty_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
     filter(
-        iijj -> inbounds(cmat, iijj) && isempty(cmat[iijj...]),
+        iijj -> (inbounds(cmat, iijj) && isempty(cmat[iijj...])),
         broadcast(vnn -> ij .+ vnn, VON_NEUMANN_NEIGHBORHOOD_2D))
 end

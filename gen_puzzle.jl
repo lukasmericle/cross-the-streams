@@ -29,15 +29,10 @@ end
 
 function int2qmk!(cvec::T) where T <: AbstractClueVector
     all_ints = findall(isa.(cvec, Int))
-    if length(all_ints) > 0
-        cvec[rand(all_ints)] = QuestionMark()
-    end
+    (length(all_ints) > 0) && (cvec[rand(all_ints)] = QuestionMark())
 end
 
-function num2ask!(cvec::T) where T <: AbstractClueVector
-    this_num = rand(1:length(cvec))
-    cvec[this_num] = Asterisk()
-end
+num2ask!(cvec::T) where T <: AbstractClueVector = (cvec[rand(1:length(cvec))] = Asterisk())
 
 function merge_num_ask!(cvec::T) where T <: AbstractClueVector
     (length(cvec) < 2) && return
@@ -48,19 +43,16 @@ function merge_num_ask!(cvec::T) where T <: AbstractClueVector
     deleteat!(cvec, rand(merge_candidates))
 end
 
-function insert_ask!(cvec::T) where T <: AbstractClueVector
-    i = rand(1:(length(cvec)+1))
-    insert!(cvec, i, Asterisk())
-end
+insert_ask!(cvec::T) where T <: AbstractClueVector = insert!(cvec, rand(1:(length(cvec)+1)), Asterisk())
 
 @views function get_puzzle_col(svec::T) where T <: OneDSolutionCellArray
     clues = Clue[]
     i = 1
     c = 0
-    while i <= length(svec)
+    while (i <= length(svec))
         if svec[i]
             c += 1
-        elseif c > 0
+        elseif (c > 0)
             push!(clues, c)
             c = 0
         end

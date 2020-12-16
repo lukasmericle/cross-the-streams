@@ -5,7 +5,7 @@ using Statistics: mean
 
 function construct_gaussian_kernel(k::T) where T <: Real
     k = max(3, trunc(Int8, k))
-    if iseven(k) k -= 1 end  # k should be odd so that the kernel is always centered on a cell
+    iseven(k) && (k -= 1)  # k should be odd so that the kernel is always centered on a cell
     v = float.(map(x->binomial(k-1,x), 0:(k-1)))
     kernel = v * v'  # outer product
     kernel ./= sum(kernel)
@@ -57,7 +57,7 @@ function generate_solution(n::Int, m::Int)
     ijs = TwoDCoord[(rand(1:n), rand(1:m))]
     kernel = make_kernel(smat)
 
-    while length(ijs) > 0
+    while (length(ijs) > 0)
 
         idx = choose_next_site(smat, kernel, ijs)
         ij = splice!(ijs, idx)
@@ -70,7 +70,7 @@ function generate_solution(n::Int, m::Int)
 
         # get empty neighbors
         next_ijs = empty_neighbor_sites(smat, ij)
-        if length(next_ijs) > 0
+        if (length(next_ijs) > 0)
             append!(ijs, next_ijs)
             unique!(ijs)
         end
@@ -81,6 +81,4 @@ function generate_solution(n::Int, m::Int)
 
 end
 
-function generate_solution(n::Int)
-    generate_solution(n, n)
-end
+generate_solution(n::Int) = generate_solution(n, n)
