@@ -37,8 +37,11 @@ function merge_num_ask!(cvec::T) where T <: AbstractClueVector
     (length(cvec) < 2) && return
     all_asks = findall(isa.(cvec, Asterisk))
     (length(all_asks) === 0) && return
-    merge_candidates = filter(x->inbounds(cvec, x), VON_NEUMANN_NEIGHBORHOOD_1D .+ rand(all_asks))
-    (length(merge_candidates) === 0) && return
+    m = 0
+    while (m === 0)
+        merge_candidates = filter(x->inbounds(cvec, x), VON_NEUMANN_NEIGHBORHOOD_1D .+ rand(all_asks))
+        m = length(merge_candidates)
+    end
     deleteat!(cvec, rand(merge_candidates))
 end
 
