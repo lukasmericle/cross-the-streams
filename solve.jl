@@ -1,6 +1,6 @@
 export solve
-
-init_cmat(pzl::Puzzle) = init_cmat(size(pzl)...)
+import Base: sort
+export       sort
 
 @views function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
     dummy_row = init_cvec(size(pzl, 2))
@@ -12,6 +12,9 @@ end
     MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(pzl)[i]), 1:size(cmat, 1)),
                        map(i -> count_states(cmat[:,j], cols(pzl)[j]), 1:size(cmat, 2)))
 end
+
+init_cmat(pzl::Puzzle) = init_cmat(size(pzl)...)
+complexity(pzl::Puzzle) = complexity(MatrixStateCounter(pzl))
 
 function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVector
     n_reqd_cells = 0
@@ -28,7 +31,7 @@ function space_for_ints(cluevec_ints_after::T) where T <: AbstractClueVector
     (length(cluevec_ints_after) == 0) && return 0
     sum(cluevec_ints_after) + length(cluevec_ints_after)
 end
-function space_for_qmks(all_qmks::Array{Int}, i::Int)
+function space_for_qmks(all_qmks::Vector{Int}, i::Int)
     num_qmks_before = count(x -> (x < i), all_qmks)
     2 * num_qmks_before, 2 * (length(all_qmks) - num_qmks_before)  # num before, num after
 end
@@ -40,7 +43,7 @@ end
     """
     if (length(cluevec) == 0)
         if any(skipmissing(cellvec))
-            return NaN  # if any trues but no col description, bound this branch
+            return nothing  # if any trues but no clues, bound this branch
         else
             return VectorStateCounter(cellvec; init="empty")  # if no trues, no-op
         end
@@ -50,9 +53,9 @@ end
     all_asks = findall(isa.(cluevec, Asterisk))
     n_reqd_cells = minreq_cells(cluevec[all_ints], length(all_qmks))
     if (n_reqd_cells > length(cellvec))
-        return NaN  # if the col description won't fit into the grid, bound this branch
+        return nothing  # if the clues won't fit into the grid, bound this branch
     elseif (length(cellvec) === 0)
-        return VectorStateCounter(cellvec; init="empty")  # reach this branch if (length(cellvec) == 0) and col has only Asterisk in it; no-op
+        return VectorStateCounter(cellvec; init="empty")  # reach this branch if (length(cellvec) == 0) and cluevec has only Asterisk in it; no-op
     end
     counter = VectorStateCounter(cellvec; init="blank")
     if (length(all_ints) > 0)
@@ -62,29 +65,30 @@ end
         cluevec_after = cluevec[first_int+1:end]
         space_for_ints_after = space_for_ints(cluevec[all_ints[2:end]])
         space_for_qmks_before, space_for_qmks_after = space_for_qmks(all_qmks, first_int)
-        last_pos_apriori = length(cellvec) - (run_length - 1)
+        last_pos_apriori = length(cellvec) - (run_length - 1)  # minus 1 because ranges are inclusive in Julia
         first_pos = 1 + space_for_qmks_before
-        last_pos = last_pos_apriori - space_for_ints_after - space_for_qmks_after
-        # if first_pos > last_pos, this for loop is skipped and counter is returned blank (thus this branch is bounded)
-        for pos=first_pos:last_pos
+        last_pos = last_pos_apriori - (space_for_ints_after + space_for_qmks_after)
+        for pos=first_pos:last_pos   # if first_pos > last_pos, this for loop is skipped and counter is returned blank (thus this branch is bounded)
             cellvec_middle = cellvec[pos:pos+(run_length-1)]
-            any(isfalse.(cellvec_middle)) && continue  # continue if filled cell should be empty
+            any(isfalse.(cellvec_middle)) && continue  # continue if filled cell(s) should be empty
             counter_middle = VectorStateCounter(cellvec_middle; init="full")
             if (pos == 1)
                 counter_before = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos-1]) && continue  # continue if empty cell should be filled
                 cellvec_before = cellvec[1:pos-2]
-                counter_before = count_states(cellvec_before, cluevec_before) * VectorStateCounter(1; init="empty")
-                (isnan(counter_before) || (n(counter_before) === 0)) && continue
+                counter_before = count_states(cellvec_before, cluevec_before)
+                isnothing(counter_before) && continue
+                counter_before = counter_before * VectorStateCounter(1; init="empty")
             end
             if (pos == last_pos_apriori)
                 counter_after = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos+(run_length-1)+1]) && continue  # continue if empty cell should be filled
                 cellvec_after = cellvec[pos+(run_length-1)+2:end]
-                counter_after = VectorStateCounter(1; init="empty") * count_states(cellvec_after, cluevec_after)
-                (isnan(counter_after) || (n(counter_after) === 0)) && continue
+                counter_after = count_states(cellvec_after, cluevec_after)
+                isnothing(counter_after) && continue
+                counter_after = VectorStateCounter(1; init="empty") * counter_after
             end
             counter += vcat(counter_before, counter_middle, counter_after)
         end
@@ -101,8 +105,8 @@ end
         end
     elseif (length(all_asks) > 0)
         all(ismissing.(cellvec)) && return VectorStateCounter(cellvec; init="askmissing")
-        all(istrue.(cellvec)) && return VectorStateCounter(cellvec; init="full")
-        all(isfalse.(cellvec)) && return VectorStateCounter(cellvec; init="empty")
+        all(cellvec) && return VectorStateCounter(cellvec; init="full")
+        all(.!cellvec) && return VectorStateCounter(cellvec; init="empty")
         first_ask = all_asks[1]
         cluevec_before = cluevec[1:first_ask-1]
         cluevec_middle = QuestionMark[]
@@ -112,21 +116,21 @@ end
             push!(cluevec_middle, QuestionMark())  # an asterisk represents a sequence of question marks of length 0 or more
         end
     end
-    counter
+    (n(counter) === 0) ? nothing : counter
 end
 
 @views function recount!(counter::VectorStateCounter, cellvec::T, cluevec::S) where {T <: OneDCellArray,  S <: AbstractClueVector}
     new_counter = count_states(cellvec, cluevec)
-    isnan(new_counter) && error("No valid states found during recount")
+    isnothing(new_counter) && error("No valid states found during recount")
     counter.cumul[:] .= new_counter.cumul
     counter.n = new_counter.n
 end
-@views function recount!(counter::MatrixStateCounter, cmat::T, pzl::Puzzle, rowcol::Tuple{Char, Int}) where {T <: TwoDCellArray}
-    if (rowcol[1] === 'R')
-        i = rowcol[2]
+@views function recount!(counter::MatrixStateCounter, cmat::T, pzl::Puzzle, rc::Tuple{Char, Int}) where {T <: TwoDCellArray}
+    if (rc[1] === 'R')
+        i = rc[2]
         recount!(rows(counter)[i], cmat[i,:], rows(pzl)[i])
-    elseif (rowcol[1] === 'C')
-        j = rowcol[2]
+    elseif (rc[1] === 'C')
+        j = rc[2]
         recount!(cols(counter)[j], cmat[:,j], cols(pzl)[j])
     else
         error("rowcol must either refer to row ('R') or col ('C')")
@@ -134,34 +138,51 @@ end
 end
 
 @views function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
-    this_odds = odds(counter)
     cmat_copy = copy(cmat)
+    this_odds = odds(counter)
     @. cmat[isone(this_odds)] = true
     @. cmat[iszero(this_odds)] = false
     updates = (cmat_copy .!== cmat)  # true where a missing flipped to true or false
-    obsolete_row_idxs = findall(any.(eachrow(updates)))  # if any updates occur in a row, that row is obsolete
-    obsolete_col_idxs = findall(any.(eachcol(updates)))
-    vcat(map(r -> ('R', r), obsolete_row_idxs), map(c -> ('C', c), obsolete_col_idxs))
+    filter!(rc -> (((rc[1] === 'R') && (n(rows(counter)[rc[2]]) > 1))
+                || ((rc[1] === 'C') && (n(cols(counter)[rc[2]]) > 1))),
+            vcat(map(r -> ('R', r), findall(any.(eachrow(updates)))),  # if any updates occur in a row, that row is obsolete
+                 map(c -> ('C', c), findall(any.(eachcol(updates))))))
+end
+
+function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
+    """
+    Sort the rcs so that the easiest rows and cols
+    (with the fewest possible states) are first in the list.
+    """
+    row_idxs, col_idxs = Int[], Int[]
+    for rc=rcs
+        if rc[1] === 'R'
+            push!(row_idxs, rc[2])
+        elseif rc[1] === 'C'
+            push!(col_idxs, rc[2])
+        else
+            error("rowcol must either refer to row ('R') or col ('C')")
+        end
+    end
+    sort_ord = sortperm(vcat(map(n, rows(counter)[row_idxs]),   # get the order that the rcs should be in
+                             map(n, cols(counter)[col_idxs])))  # (from fewest to most states, to encourage quickly acting on good information)
+    rcs[:] .= @view vcat(map(r -> ('R', r), row_idxs),
+                             map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
 end
 
 function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
-    obsolete_rowcols = update!(cmat, counter)
-    while (complexity(counter) > 1)
-        if (length(obsolete_rowcols) > 0)
-            rowcol = popfirst!(obsolete_rowcols)
-            recount!(counter, cmat, pzl, rowcol)
-            new_obsolete_rowcols = update!(cmat, counter)
-            if (length(new_obsolete_rowcols) > 0)
-                append!(obsolete_rowcols, new_obsolete_rowcols)
-                unique!(obsolete_rowcols)
+    obsolete_rcs = update!(cmat, counter)
+    while (num_states(counter) > 1)
+        if (length(obsolete_rcs) > 0)
+            rc = popfirst!(obsolete_rcs)
+            recount!(counter, cmat, pzl, rc)
+            new_obsolete_rcs = update!(cmat, counter)
+            if (length(new_obsolete_rcs) > 0)
+                append!(obsolete_rcs, new_obsolete_rcs)
+                unique!(obsolete_rcs)
+                sort!(obsolete_rcs, counter)
             end
-            filter!(rc -> (((rc[1] === 'R') && (n(rows(counter)[rc[2]]) > 1))
-                        || ((rc[1] === 'C') && (n(cols(counter)[rc[2]]) > 1))),
-                    obsolete_rowcols)
         else
-            println(complexity(counter))
-            println(entropy(counter))
-            println(string(cmat))
             # if we're out of ideas, we make a best guess and backtrack if it didn't work
             # TODO: implement backtracking exploration
             break

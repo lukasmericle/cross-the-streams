@@ -1,16 +1,16 @@
 export VectorStateCounter, MatrixStateCounter
-import Base: vcat, isnan, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
-export       vcat, isnan, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
+import Base: vcat, isnothing, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
+export       vcat, isnothing, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
 
 using Lazy: @forward
 
 abstract type AbstractStateCounter end
 
 mutable struct VectorStateCounter <: AbstractStateCounter
-    cumul::Array{Int, 1}
+    cumul::Vector{Int}
     n::Int
 end
-VectorStateCounter() = NaN
+VectorStateCounter() = nothing
 function VectorStateCounter(m::Int; init::String="blank")
     if (init == "blank")
         cumul = zeros(Int, m)
@@ -29,6 +29,8 @@ function VectorStateCounter(m::Int; init::String="blank")
 end
 VectorStateCounter(cvec::T; init::String="blank") where T <: OneDCellArray = VectorStateCounter(length(cvec); init=init)
 
+MaybeVectorStateCounter = Union{Nothing, VectorStateCounter}
+
 cumul(counter::VectorStateCounter) = counter.cumul
 n(counter::VectorStateCounter) = counter.n
 
@@ -41,7 +43,17 @@ n(counter::VectorStateCounter) = counter.n
 @forward VectorStateCounter.cumul firstindex
 @forward VectorStateCounter.cumul lastindex
 
-Base.isnan(counter::VectorStateCounter) = false
+Base.isnothing(counter::VectorStateCounter) = false
+
+function (Base.:+)(a::VectorStateCounter, b::VectorStateCounter)
+    a.cumul[:] .+= b.cumul
+    a.n += b.n
+    a
+end
+(Base.:+)(a::VectorStateCounter, b::Nothing) = a
+(Base.:+)(b::Nothing, a::VectorStateCounter) = a
+
+(Base.:*)(a::MaybeVectorStateCounter, b::MaybeVectorStateCounter) = Base.vcat(a, b)
 
 function Base.vcat(a::VectorStateCounter, b::VectorStateCounter)
     (length(a) === 0) && return b
@@ -50,20 +62,9 @@ function Base.vcat(a::VectorStateCounter, b::VectorStateCounter)
     a.n *= n(b)
     a
 end
-Base.vcat(a::VectorStateCounter, b::T) where T <: AbstractFloat = isnan(b) ? b : error("cannot concatenate a state counter and a float")
-Base.vcat(b::T, a::VectorStateCounter) where T <: AbstractFloat = Base.vcat(a, b)
-
-function (Base.:+)(a::VectorStateCounter, b::VectorStateCounter)
-    a.cumul .+= b.cumul
-    a.n += b.n
-    a
-end
-(Base.:+)(a::VectorStateCounter, b::T) where T <: AbstractFloat = isnan(b) ? a : error("cannot add a state counter and a float")  # just ignores the NaN
-(Base.:+)(b::T, a::VectorStateCounter) where T <: AbstractFloat = a + b
-
-(Base.:*)(a::Union{T, VectorStateCounter}, b::Union{T, VectorStateCounter}) where T <: AbstractFloat = Base.vcat(a, b)
-
-Base.vcat(counters::Vararg{Union{T, VectorStateCounter}}) = prod(counters)
+Base.vcat(a::VectorStateCounter, b::Nothing) = nothing
+Base.vcat(b::Nothing, a::VectorStateCounter) = nothing
+Base.vcat(counters::Vararg{MaybeVectorStateCounter}) = prod(counters)
 
 mutable struct MatrixStateCounter <: AbstractStateCounter
     rows::Vector{VectorStateCounter}
@@ -77,10 +78,12 @@ end
 rows(counter::MatrixStateCounter) = counter.rows
 cols(counter::MatrixStateCounter) = counter.cols
 
+Base.isnothing(counter::MatrixStateCounter) = false
+
 Base.size(counter::MatrixStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("matrix state counter has only two dimensions"))
 Base.size(counter::MatrixStateCounter) = (Base.size(counter, 1), Base.size(counter, 2))
 
-function odds_rowcol(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
+function odds_rc(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
     any(isone.(xy)) && return 1.0
     any(iszero.(xy)) && return 0.0
     prod(xy)
@@ -93,11 +96,15 @@ function odds(counter::MatrixStateCounter)
     omat = Array{Float64}(undef, 2, n, m)
     for i=1:n omat[1,i,:] .= odds(rows(counter)[i]) end
     for j=1:m omat[2,:,j] .= odds(cols(counter)[j]) end
-    mapslices(odds_rowcol, omat, dims=[1])[1,:,:]
+    mapslices(odds_rc, omat, dims=[1])[1,:,:]
 end
+
+num_states(counter::VectorStateCounter) = convert(BigInt, n(counter))
+max_num_states(counter::VectorStateCounter) = 2 ^ convert(BigInt, length(counter))  # this is the number of states when `cluevec = [Asterisk()]`
+num_states(counter::MatrixStateCounter) = prod(num_states.(rows(counter))) * prod(num_states.(cols(counter)))
+max_num_states(counter::MatrixStateCounter) = 2 ^ convert(BigInt, length(rows(counter)) + length(cols(counter)))
+
+complexity(counter::T) where T <: AbstractStateCounter = BigFloat(num_states(counter) - 1) / BigFloat(max_num_states(counter) - 1)
 
 entropy(p::T) where T <: AbstractFloat = (isone(p) || iszero(p)) ? 0.0 : -(p * log(p) + (1 - p) * log(1 - p)) / log(2)  # log(2) to normalize output between 0 and 1
 entropy(counter::T) where T <: AbstractStateCounter = mean(entropy.(odds(counter)))
-
-complexity(counter::VectorStateCounter) = n(counter)
-complexity(counter::MatrixStateCounter) = prod(convert.(BigInt, map(n, rows(counter)))) * prod(convert.(BigInt, map(n, cols(counter))))
