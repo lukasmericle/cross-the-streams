@@ -11,7 +11,7 @@ struct Asterisk end
 Clue = Union{T, QuestionMark, Asterisk} where T <: Int
 ClueRepr = Union{T, String} where T <: Int
 
-ClueVector = Array{Clue, 1}
+ClueVector = Vector{Clue}
 ClueVectorView = SubArray{Clue, 1, ClueVector}
 AbstractClueVector = Union{ClueVector, ClueVectorView}
 
@@ -20,8 +20,8 @@ Base.string(n::Asterisk) = "*"
 Base.string(cvec::T) where T <: AbstractClueVector = join(Base.string.(cvec), " ")
 
 struct Puzzle
-    rows::Array{ClueVector}
-    cols::Array{ClueVector}
+    rows::Vector{ClueVector}
+    cols::Vector{ClueVector}
 end
 
 rows(pzl::Puzzle) = pzl.rows
@@ -37,5 +37,3 @@ function Base.string(pzl::Puzzle)
     s *= join(string.(cols(pzl)), "\n")
     s
 end
-
-complexity(pzl::Puzzle) = complexity(MatrixStateCounter(pzl))

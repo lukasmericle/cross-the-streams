@@ -10,7 +10,7 @@ function construct_gaussian_kernel(k::T) where T <: Real
     kernel ./= sum(kernel)
 end
 
-@views function convolve(smat::TC, kernel::Array{TK, 2}, ij::TwoDCoord) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
+@views function convolve(smat::TC, kernel::Matrix{TK}, ij::TwoDCoord) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
     c = 0.0
     let k = size(kernel, 1), kk = trunc(Int, (k-1)/2), (i, j) = ij
         for u=1:k
@@ -33,7 +33,7 @@ KERNEL_WIDTH_COEFF = BASE_COEFF ^ (1 - log1p(666e-4))
 make_kernel(smat::T) where T <: TwoDSolutionCellArray = construct_gaussian_kernel(sqrt(prod(size(smat))) ^ KERNEL_WIDTH_COEFF)
 
 NEXT_SITE_COEFF = BASE_COEFF ^ (1 + log(666e-2))
-@views function choose_next_site(smat::TC, kernel::Array{TK, 2}, ijs::Array{TwoDCoord}) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
+@views function choose_next_site(smat::TC, kernel::Matrix{TK}, ijs::Vector{TwoDCoord}) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
     """
     Chooses the next site based on weights derived from
     the local density of true cells in the current state.

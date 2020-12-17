@@ -10,8 +10,7 @@ CellState = Union{Bool, Missing}
 
 istrue(x::CellState) = !ismissing(x) && x
 isfalse(x::CellState) = !ismissing(x) && !x
-isfilled(x::CellState) = istrue(x)
-isempty(x::CellState) = !isfilled(x)
+isempty(x::CellState) = ismissing(x) || !x  # == !istrue(x)
 
 CellVector = Vector{CellState}
 SolutionCellVector = Vector{Bool}
@@ -41,20 +40,11 @@ TwoDCoord = Tuple{Int,Int}
 VON_NEUMANN_NEIGHBORHOOD_1D = [-1, 1]
 VON_NEUMANN_NEIGHBORHOOD_2D = [(0,-1), (-1,0), (1,0), (0,1)]
 
-function init_cmat(n::Int, m::Int)
-    cmat = CellMatrix(undef, n, m)
-    fill!(cmat, missing)
-    cmat
-end
-
-function init_cvec(n::Int)
-    cvec = CellVector(undef, n)
-    fill!(cvec, missing)
-    cvec
-end
+init_cvec(n::Int) = convert(CellVector, fill(missing, n))
+init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
 
 string_vec(cvec::T) where T <: OneDAbstractCellArray = prod(map(x -> (ismissing(x) ? "><" : (x ? "██" : "  ")),  cvec))
-Base.string(cvec::T) where T <: OneDCellArray = string_vec(cvec)  # to avoid ambiguity, overload with custom method
+Base.string(cvec::T) where T <: OneDCellArray = string_vec(cvec)  # to avoid ambiguity during dispatch, overload with custom method
 Base.string(cvec::T) where T <: OneDSolutionCellArray = string_vec(cvec)
 
 function string_mat(cmat::T) where T <: TwoDAbstractCellArray
@@ -77,12 +67,13 @@ inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cma
     Return true if any of the two-by-two's which contain (i,j)
     have three or more filled cells.
     """
+    istrue(cmat[ij...]) && error("This cell is already filled")
     let (i,j) = ij
         for ii=(i-1):i
             !((1 <= ii) && (ii+1 <= size(cmat, 1))) && continue
             for jj=(j-1):j
                 !((1 <= jj) && (jj+1 <= size(cmat, 2))) && continue
-                (count(cmat[ii:ii+1,jj:jj+1]) >= 3) && return true
+                (count(cmat[ii:ii+1,jj:jj+1]) === 3) && return true
             end
         end
     end
