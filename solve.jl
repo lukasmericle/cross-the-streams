@@ -212,6 +212,10 @@ function issolution(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter) where 
     !isnothing(s) && (num_states(counter) === 1)
 end
 
+function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ij::CartesianIndex{2}, guess::Bool) where T <: TwoDCellArray
+    cmat[ij] = guess
+    solve(puzzle, cmat, counter, [ij])
+end
 function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector{CartesianIndex{2}}) where T <: TwoDCellArray
     #TODO: add guardrails using iscrowded()
     rcs = ijs2rcs(ijs)
@@ -223,7 +227,6 @@ function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector
         if isnothing(s)
             cmat[history] .= missing
             recount!(counter, cmat, puzzle, history)
-            println("up")
             return cmat
         end
         new_ijs = update!(cmat, counter)
@@ -236,6 +239,7 @@ function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector
             unique!(rcs)
             sort!(rcs, counter)
         end
+        println(string(cmat))
     end
     # once we're out of deterministic updates, we make a best guess to continue and backtrack if it doesn't work out
     this_odds = odds(counter)
@@ -243,19 +247,16 @@ function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector
     @. uncertainty[iszero(uncertainty)] = 1.0
     while !all(isone.(uncertainty))
         ent, ij = findmin(uncertainty)
-        println(ij)
-        initial_guess = (this_odds[ij] >= 0.5)
-        cmat[ij] = initial_guess
-        cmat = solve(puzzle, cmat, counter, [ij])
-        if ismissing(cmat[ij])
-            cmat[ij] = !initial_guess
-            cmat = solve(puzzle, cmat, counter, [ij])
-        end
         uncertainty[ij] = 1.0  # "remove" it from the "list"
+        initial_guess = (this_odds[ij] >= 0.5)
+        cmat = solve(puzzle, cmat, counter, ij, initial_guess)
+        if ismissing(cmat[ij])
+            cmat = solve(puzzle, cmat, counter, ij, !initial_guess)
+        end
         ismissing(cmat[ij]) && continue
         check_cmat(puzzle, cmat, counter) && return convert(SolutionCellMatrix, cmat)
+        println(string(cmat))
     end
-    println("up")
     cmat  # if we've gone through the whole list and still can't find a good result, then we need to backtrack
 end
 function solve(puzzle::Puzzle)
