@@ -13,7 +13,7 @@ end
 
 @views function convolve(smat::TC, kernel::Matrix{TK}, ij::TwoDCoord) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
     c = 0.0
-    let k = size(kernel, 1), kk = trunc(Int, (k-1)/2), (i, j) = ij
+    let k = size(kernel, 1), kk = trunc(Int, (k - 1) / 2), (i, j) = ij
         for u=1:k
             ii = i + (u - 1) - kk
             !inbounds(smat, ii, 1) && continue
@@ -39,8 +39,7 @@ NEXT_SITE_COEFF = BASE_COEFF ^ (1 + log(666e-2))
     Chooses the next site based on weights derived from
     the local density of true cells in the current state.
     """
-    inv_w = map(ij->convolve(smat, kernel, ij), ijs)  # TODO: check if `convolve.(smat, kernel, ijs)` works
-    sample(1:length(ijs), Weights(@. 1 / (inv_w ^ NEXT_SITE_COEFF)))
+    sample(1:length(ijs), Weights(1 ./ (map(ij->convolve(smat, kernel, ij), ijs) .^ NEXT_SITE_COEFF)))
 end
 
 RAND_SKIP_COEFF = BASE_COEFF ^ (1 - log1p(55555e-6))
