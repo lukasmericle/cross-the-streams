@@ -196,6 +196,7 @@ issmat(cmat::T) where T <: TwoDAbstractCellArray = all(@. !ismissing(cmat))
 function iscontiguous(cmat::T) where T <: TwoDSolutionCellArray
     start_idx = findfirst(istrue.(cmat))
     # TODO: flood fill to determine whether all trues are contiguous
+    true
 end
 
 function check_cmat(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDAbstractCellArray
@@ -241,7 +242,7 @@ function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector
     uncertainty = entropy.(this_odds)
     @. uncertainty[iszero(uncertainty)] = 1.0
     while !all(isone.(uncertainty))
-        ij = findmin(uncertainty)[2]
+        ent, ij = findmin(uncertainty)
         println(ij)
         initial_guess = (this_odds[ij] >= 0.5)
         cmat[ij] = initial_guess

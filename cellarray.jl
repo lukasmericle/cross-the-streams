@@ -1,9 +1,6 @@
 export CellMatrix, SolutionCellMatrix
 export init_cmat
 
-VON_NEUMANN_NEIGHBORHOOD_1D = [-1, 1]
-VON_NEUMANN_NEIGHBORHOOD_2D = [(0,-1), (-1,0), (1,0), (0,1)]
-
 CellState = Union{Bool, Missing}
 
 CellVector = Vector{CellState}
@@ -29,7 +26,15 @@ TwoDSolutionCellArray = Union{SolutionCellMatrix, SolutionCellMatrixMatrixView}
 OneDAbstractCellArray = Union{OneDCellArray, OneDSolutionCellArray}
 TwoDAbstractCellArray = Union{TwoDCellArray, TwoDSolutionCellArray}
 
-TwoDCoord = Tuple{Int,Int}
+OneDCoord = CartesianIndex{1}
+TwoDCoord = CartesianIndex{2}
+
+VON_NEUMANN_NEIGHBORHOOD_1D = [OneDCoord(-1),
+                               OneDCoord(1)]
+VON_NEUMANN_NEIGHBORHOOD_2D = [TwoDCoord(0,-1),
+                               TwoDCoord(-1,0),
+                               TwoDCoord(1,0),
+                               TwoDCoord(0,1)]
 
 string_vec(cvec::T) where T <: OneDAbstractCellArray = prod(map(x -> (ismissing(x) ? "><" : (x ? "██" : "  ")),  cvec))
 Base.string(cvec::T) where T <: OneDCellArray = string_vec(cvec)  # to avoid ambiguity during dispatch, overload with custom method
@@ -65,8 +70,8 @@ Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
     Return true if any of the two-by-two's which contain (i,j)
     have three or more filled cells.
     """
-    istrue(cmat[ij...]) && error("This cell is already filled")
-    let (i,j) = ij
+    istrue(cmat[ij]) && error("This cell is already filled")
+    let (i, j) = Tuple(ij)
         for ii=(i-1):i
             !((1 <= ii) && (ii+1 <= size(cmat, 1))) && continue
             for jj=(j-1):j
@@ -80,6 +85,6 @@ end
 
 @views function empty_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
     filter(
-        iijj -> (inbounds(cmat, iijj) && isempty(cmat[iijj...])),
-        broadcast(vnn -> ij .+ vnn, VON_NEUMANN_NEIGHBORHOOD_2D))
+        iijj -> (inbounds(cmat, iijj) && isempty(cmat[iijj])),
+        broadcast(vnn -> ij + vnn, VON_NEUMANN_NEIGHBORHOOD_2D))
 end

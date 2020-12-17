@@ -13,7 +13,7 @@ end
 
 @views function convolve(smat::TC, kernel::Matrix{TK}, ij::TwoDCoord) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
     c = 0.0
-    let k = size(kernel, 1), kk = trunc(Int, (k - 1) / 2), (i, j) = ij
+    let k = size(kernel, 1), kk = trunc(Int, (k - 1) / 2), (i, j) = Tuple(ij)
         for u=1:k
             ii = i + (u - 1) - kk
             !inbounds(smat, ii, 1) && continue
@@ -51,13 +51,13 @@ end
 
 function generate_solution(n::Int, m::Int)
     smat = fill(false, n, m)
-    ijs = TwoDCoord[(rand(1:n), rand(1:m))]
+    ijs = [TwoDCoord(rand(1:n), rand(1:m))]
     kernel = make_kernel(smat)
     while (length(ijs) > 0)
         idx = choose_next_site(smat, kernel, ijs)
         ij = splice!(ijs, idx)
         (iscrowded(smat, ij) || random_skip(smat, ij)) && continue
-        smat[ij...] = true  # if we get here, flip site to true
+        smat[ij] = true  # if we get here, flip site to true
         next_ijs = empty_neighbor_sites(smat, ij)
         if (length(next_ijs) > 0)
             append!(ijs, next_ijs)
