@@ -1,19 +1,40 @@
 export solve
 
-@views function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
-    dummy_row = init_cvec(size(pzl, 2))
-    dummy_col = init_cvec(size(pzl, 1))
-    MatrixStateCounter(map(i -> count_states(dummy_row, rows(pzl)[i]), 1:size(pzl, 1)),
-                       map(j -> count_states(dummy_col, cols(pzl)[j]), 1:size(pzl, 2)))
+@views function MatrixStateCounter(puzzle::Puzzle)  # initializes based on puzzle description assuming grid is blank
+    dummy_row = init_cvec(size(puzzle, 2))
+    dummy_col = init_cvec(size(puzzle, 1))
+    MatrixStateCounter(map(i -> count_states(dummy_row, rows(puzzle)[i]), 1:size(puzzle, 1)),
+                       map(j -> count_states(dummy_col, cols(puzzle)[j]), 1:size(puzzle, 2)))
 end
-@views function MatrixStateCounter(cmat::T, pzl::Puzzle) where T <: TwoDCellArray  # initializes based on puzzle description and current state of grid
-    MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(pzl)[i]), 1:size(cmat, 1)),
-                       map(i -> count_states(cmat[:,j], cols(pzl)[j]), 1:size(cmat, 2)))
+@views function MatrixStateCounter(cmat::T, puzzle::Puzzle) where T <: TwoDAbstractCellArray  # initializes based on puzzle description and current state of grid
+    MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(puzzle)[i]), 1:size(cmat, 1)),
+                       map(j -> count_states(cmat[:,j], cols(puzzle)[j]), 1:size(cmat, 2)))
 end
 
-init_cmat(pzl::Puzzle) = init_cmat(size(pzl)...)
+@views function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
+    """
+    Sort the rcs so that the easiest rows and cols
+    (with the fewest possible states) are first in the list.
+    """
+    row_idxs, col_idxs = Int[], Int[]
+    for rc=rcs
+        if rc[1] === 'R'
+            push!(row_idxs, rc[2])
+        elseif rc[1] === 'C'
+            push!(col_idxs, rc[2])
+        else
+            error("rowcol must either refer to row ('R') or col ('C')")
+        end
+    end
+    sort_ord = sortperm(vcat(map(n, rows(counter)[row_idxs]),   # get the order that the rcs should be in
+                             map(n, cols(counter)[col_idxs])))  # (from fewest to most states, to encourage quickly acting on good information)
+    rcs[:] .= vcat(map(r -> ('R', r), row_idxs),
+                   map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
+end
 
-complexity(pzl::Puzzle) = complexity(MatrixStateCounter(pzl))
+init_cmat(puzzle::Puzzle) = init_cmat(size(puzzle)...)
+
+complexity(puzzle::Puzzle) = complexity(MatrixStateCounter(puzzle))
 
 function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVector
     n_reqd_cells = 0
@@ -37,7 +58,7 @@ function space_for_qmks(all_qmks::Vector{Int}, i::Int)
     2 * num_qmks_before, 2 * (length(all_qmks) - num_qmks_before)  # num before, num after
 end
 
-@views function count_states(cellvec::T, cluevec::S) where {T <: OneDCellArray,  S <: AbstractClueVector}
+@views function count_states(cellvec::T, cluevec::S) where {T <: OneDAbstractCellArray,  S <: AbstractClueVector}
     """
     Uses dynamic programming and branch-and-bound to test and accumulate
     all possible configurations of cells based on current col state and col description.
@@ -120,75 +141,125 @@ end
     (n(counter) === 0) ? nothing : counter
 end
 
-@views function recount!(counter::VectorStateCounter, cellvec::T, cluevec::S) where {T <: OneDCellArray,  S <: AbstractClueVector}
+ij2rc(ij::CartesianIndex{2}) = [('R', ij[1]), ('C', ij[2])]
+ijs2rcs(ijs::Vector{CartesianIndex{2}}) = vcat(ij2rc.(ijs)...)
+
+@views function recount!(counter::VectorStateCounter, cellvec::T, cluevec::S) where {T <: OneDAbstractCellArray,  S <: AbstractClueVector}
     new_counter = count_states(cellvec, cluevec)
-    isnothing(new_counter) && error("No valid states found during recount")
+    isnothing(new_counter) && return nothing  # error("No valid states found during recount")
     counter.cumul[:] .= new_counter.cumul
     counter.n = new_counter.n
+    true
 end
-@views function recount!(counter::MatrixStateCounter, cmat::T, pzl::Puzzle, rc::Tuple{Char, Int}) where {T <: TwoDCellArray}
+@views function recount!(counter::MatrixStateCounter, cmat::T, puzzle::Puzzle, rc::Tuple{Char, Int}) where T <: TwoDAbstractCellArray
     if (rc[1] === 'R')
         i = rc[2]
-        recount!(rows(counter)[i], cmat[i,:], rows(pzl)[i])
+        s = recount!(rows(counter)[i], cmat[i,:], rows(puzzle)[i])
     elseif (rc[1] === 'C')
         j = rc[2]
-        recount!(cols(counter)[j], cmat[:,j], cols(pzl)[j])
+        s = recount!(cols(counter)[j], cmat[:,j], cols(puzzle)[j])
     else
         error("rowcol must either refer to row ('R') or col ('C')")
     end
+    isnothing(s) ? nothing : true
+end
+@views function recount!(counter::MatrixStateCounter, cmat::T, puzzle::Puzzle, rcs::Vector{Tuple{Char, Int}}) where T <: TwoDAbstractCellArray
+    for rc=rcs
+        s = recount!(counter, cmat, puzzle, rc)
+        isnothing(s) && return nothing
+    end
+    true
+end
+@views function recount!(counter::MatrixStateCounter, cmat::T, puzzle::Puzzle, ij::CartesianIndex{2}) where T <: TwoDAbstractCellArray
+    i, j = Tuple(ij)
+    s1 = recount!(rows(counter)[i], cmat[i,:], rows(puzzle)[i])
+    isnothing(s1) && return nothing
+    s2 = recount!(cols(counter)[j], cmat[:,j], cols(puzzle)[j])
+    isnothing(s2) ? nothing : true
+end
+@views function recount!(counter::MatrixStateCounter, cmat::T, puzzle::Puzzle, ijs::Vector{CartesianIndex{2}}) where T <: TwoDAbstractCellArray
+    recount!(counter, cmat, puzzle, ijs2rcs(ijs))
 end
 
 @views function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
-    cmat_copy = copy(cmat)
     this_odds = odds(counter)
-    @. cmat[isone(this_odds)] = true
-    @. cmat[iszero(this_odds)] = false
-    updates = (cmat_copy .!== cmat)  # true where a missing flipped to true or false
-    filter!(rc -> (((rc[1] === 'R') && (n(rows(counter)[rc[2]]) > 1))
-                || ((rc[1] === 'C') && (n(cols(counter)[rc[2]]) > 1))),
-            vcat(map(r -> ('R', r), findall(any.(eachrow(updates)))),  # if any updates occur in a row, that row is obsolete
-                 map(c -> ('C', c), findall(any.(eachcol(updates))))))
+    missing_cmat = ismissing.(cmat)
+    true_updates = isone.(this_odds) .& missing_cmat
+    false_updates = iszero.(this_odds) .& missing_cmat
+    cmat[true_updates] .= true
+    cmat[false_updates] .= false
+    findall(true_updates .| false_updates)  # returns ijs where updates occurred this round
 end
 
-@views function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
-    """
-    Sort the rcs so that the easiest rows and cols
-    (with the fewest possible states) are first in the list.
-    """
-    row_idxs, col_idxs = Int[], Int[]
-    for rc=rcs
-        if rc[1] === 'R'
-            push!(row_idxs, rc[2])
-        elseif rc[1] === 'C'
-            push!(col_idxs, rc[2])
-        else
-            error("rowcol must either refer to row ('R') or col ('C')")
-        end
-    end
-    sort_ord = sortperm(vcat(map(n, rows(counter)[row_idxs]),   # get the order that the rcs should be in
-                             map(n, cols(counter)[col_idxs])))  # (from fewest to most states, to encourage quickly acting on good information)
-    rcs[:] .= vcat(map(r -> ('R', r), row_idxs),
-                   map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
+issmat(cmat::T) where T <: TwoDAbstractCellArray = all(@. !ismissing(cmat))
+
+function iscontiguous(cmat::T) where T <: TwoDSolutionCellArray
+    start_idx = findfirst(istrue.(cmat))
+    # TODO: flood fill to determine whether all trues are contiguous
 end
 
-function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
-    obsolete_rcs = update!(cmat, counter)
-    while (num_states(counter) > 1)
-        if (length(obsolete_rcs) > 0)
-            rc = popfirst!(obsolete_rcs)
-            recount!(counter, cmat, pzl, rc)
-            new_obsolete_rcs = update!(cmat, counter)
-            if (length(new_obsolete_rcs) > 0)
-                append!(obsolete_rcs, new_obsolete_rcs)
-                unique!(obsolete_rcs)
-                sort!(obsolete_rcs, counter)
-            end
-        else
-            # if we're out of ideas, we make a best guess and backtrack if it didn't work
-            # TODO: implement backtracking exploration
-            break
+function check_cmat(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDAbstractCellArray
+    issmat(cmat) && return issolution(puzzle, convert(SolutionCellMatrix, cmat), counter)
+    false
+end
+
+function issolution(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDSolutionCellArray
+    !iscontiguous(cmat) && return false
+    rcs = vcat(map(r -> ('R', r), findall(map(n, rows(counter)) .> 1)),
+               map(c -> ('C', c), findall(map(n, cols(counter)) .> 1)))
+    s = recount!(counter, cmat, puzzle, rcs)
+    !isnothing(s) && (num_states(counter) === 1)
+end
+
+function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector{CartesianIndex{2}}) where T <: TwoDCellArray
+    #TODO: add guardrails using iscrowded()
+    rcs = ijs2rcs(ijs)
+    sort!(rcs, counter)
+    history = ijs
+    while length(rcs) > 0
+        rc = popfirst!(rcs)
+        s = recount!(counter, cmat, puzzle, rc)
+        if isnothing(s)
+            cmat[history] .= missing
+            recount!(counter, cmat, puzzle, history)
+            println("up")
+            return cmat
+        end
+        new_ijs = update!(cmat, counter)
+        check_cmat(puzzle, cmat, counter) && return convert(SolutionCellMatrix, cmat)
+        if (length(new_ijs) > 0)
+            append!(history, new_ijs)
+            unique!(history)
+            new_rcs = ijs2rcs(new_ijs)
+            append!(rcs, new_rcs)
+            unique!(rcs)
+            sort!(rcs, counter)
         end
     end
-    convert(SolutionCellMatrix, cmat)
+    # once we're out of deterministic updates, we make a best guess to continue and backtrack if it doesn't work out
+    this_odds = odds(counter)
+    uncertainty = entropy.(this_odds)
+    @. uncertainty[iszero(uncertainty)] = 1.0
+    while !all(isone.(uncertainty))
+        ij = findmin(uncertainty)[2]
+        println(ij)
+        initial_guess = (this_odds[ij] >= 0.5)
+        cmat[ij] = initial_guess
+        cmat = solve(puzzle, cmat, counter, [ij])
+        if ismissing(cmat[ij])
+            cmat[ij] = !initial_guess
+            cmat = solve(puzzle, cmat, counter, [ij])
+        end
+        uncertainty[ij] = 1.0  # "remove" it from the "list"
+        ismissing(cmat[ij]) && continue
+        check_cmat(puzzle, cmat, counter) && return convert(SolutionCellMatrix, cmat)
+    end
+    println("up")
+    cmat  # if we've gone through the whole list and still can't find a good result, then we need to backtrack
 end
-solve(pzl::Puzzle) = solve(pzl, init_cmat(pzl), MatrixStateCounter(pzl))
+function solve(puzzle::Puzzle)
+    cmat = init_cmat(puzzle)
+    counter = MatrixStateCounter(puzzle)
+    ijs = update!(cmat, counter)
+    solve(puzzle, cmat, counter, ijs)
+end

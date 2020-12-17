@@ -23,7 +23,7 @@ function VectorStateCounter(m::Int; init::String="blank")
     end
     VectorStateCounter(cumul, n)
 end
-VectorStateCounter(cvec::T; init::String="blank") where T <: OneDCellArray = VectorStateCounter(length(cvec); init=init)
+VectorStateCounter(cvec::T; init::String="blank") where T <: OneDAbstractCellArray = VectorStateCounter(length(cvec); init=init)
 
 cumul(counter::VectorStateCounter) = counter.cumul
 n(counter::VectorStateCounter) = counter.n
@@ -39,6 +39,9 @@ MatrixStateCounter(n::Int, m::Int; init::String="blank") = MatrixStateCounter([V
 
 rows(counter::MatrixStateCounter) = counter.rows
 cols(counter::MatrixStateCounter) = counter.cols
+
+Base.copy(counter::VectorStateCounter) = VectorStateCounter(copy(cumul(counter)), copy(n(counter)))
+Base.copy(counter::MatrixStateCounter) = MatrixStateCounter(copy.(rows(counter)), copy.(cols(counter)))
 
 Base.length(counter::VectorStateCounter) = Base.length(cumul(counter))
 

@@ -58,6 +58,8 @@ init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
 inbounds(cmat::T, i::Int, dim::Int) where T <: TwoDAbstractCellArray = (1 <= i) && (i <= size(cmat, dim))
 inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cmat, ij[1], 1) && inbounds(cmat, ij[2], 2)
 
+Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
+
 @views function iscrowded(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray
     """
     Return true if any of the two-by-two's which contain (i,j)
