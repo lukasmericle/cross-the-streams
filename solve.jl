@@ -1,6 +1,4 @@
 export solve
-import Base: sort
-export       sort
 
 @views function MatrixStateCounter(pzl::Puzzle)  # initializes based on puzzle description assuming grid is blank
     dummy_row = init_cvec(size(pzl, 2))
@@ -14,6 +12,7 @@ end
 end
 
 init_cmat(pzl::Puzzle) = init_cmat(size(pzl)...)
+
 complexity(pzl::Puzzle) = complexity(MatrixStateCounter(pzl))
 
 function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVector
@@ -27,10 +26,12 @@ function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVecto
     end
     n_reqd_cells
 end
+
 function space_for_ints(cluevec_ints_after::T) where T <: AbstractClueVector
     (length(cluevec_ints_after) == 0) && return 0
     sum(cluevec_ints_after) + length(cluevec_ints_after)
 end
+
 function space_for_qmks(all_qmks::Vector{Int}, i::Int)
     num_qmks_before = count(x -> (x < i), all_qmks)
     2 * num_qmks_before, 2 * (length(all_qmks) - num_qmks_before)  # num before, num after
@@ -149,7 +150,7 @@ end
                  map(c -> ('C', c), findall(any.(eachcol(updates))))))
 end
 
-function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
+@views function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
     """
     Sort the rcs so that the easiest rows and cols
     (with the fewest possible states) are first in the list.
@@ -166,8 +167,8 @@ function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
     end
     sort_ord = sortperm(vcat(map(n, rows(counter)[row_idxs]),   # get the order that the rcs should be in
                              map(n, cols(counter)[col_idxs])))  # (from fewest to most states, to encourage quickly acting on good information)
-    rcs[:] .= @view vcat(map(r -> ('R', r), row_idxs),
-                         map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
+    rcs[:] .= vcat(map(r -> ('R', r), row_idxs),
+                   map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
 end
 
 function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray

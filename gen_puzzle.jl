@@ -46,18 +46,16 @@ insert_ask!(cvec::T) where T <: AbstractClueVector = insert!(cvec, rand(1:(lengt
 
 @views function get_puzzle_col(svec::T) where T <: OneDSolutionCellArray
     clues = Clue[]
-    i = 1
-    c = 0
-    while (i <= length(svec))
-        if svec[i]
-            c += 1
-        elseif (c > 0)
-            push!(clues, c)
-            c = 0
+    clue = 0
+    for cell=svec
+        if cell
+            clue += 1
+        elseif (clue > 0)
+            push!(clues, clue)
+            clue = 0
         end
-        i += 1
     end
-    (c > 0) && push!(clues, c)
+    (clue > 0) && push!(clues, clue)
     clues
 end
 
@@ -72,3 +70,5 @@ function generate_puzzle(smat::T) where T <: TwoDSolutionCellArray
     # end
     Puzzle(prows, pcols)
 end
+generate_puzzle(n::Int, m::Int) = generate_puzzle(generate_solution(n, m))
+generate_puzzle(n::Int) = generate_puzzle(n, n)

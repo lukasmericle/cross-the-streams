@@ -1,14 +1,10 @@
-export CellState, CellVector, SolutionCellVector, CellMatrix, SolutionCellMatrix
-export init_cmat, init_cvec
-export empty_neighbor_sites
-import Base: string
-export       string
+export CellMatrix, SolutionCellMatrix
+export init_cmat
+
+VON_NEUMANN_NEIGHBORHOOD_1D = [-1, 1]
+VON_NEUMANN_NEIGHBORHOOD_2D = [(0,-1), (-1,0), (1,0), (0,1)]
 
 CellState = Union{Bool, Missing}
-
-istrue(x::CellState) = !ismissing(x) && x
-isfalse(x::CellState) = !ismissing(x) && !x
-isempty(x::CellState) = ismissing(x) || !x  # == !istrue(x)
 
 CellVector = Vector{CellState}
 SolutionCellVector = Vector{Bool}
@@ -35,12 +31,6 @@ TwoDAbstractCellArray = Union{TwoDCellArray, TwoDSolutionCellArray}
 
 TwoDCoord = Tuple{Int,Int}
 
-VON_NEUMANN_NEIGHBORHOOD_1D = [-1, 1]
-VON_NEUMANN_NEIGHBORHOOD_2D = [(0,-1), (-1,0), (1,0), (0,1)]
-
-init_cvec(n::Int) = convert(CellVector, fill(missing, n))
-init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
-
 string_vec(cvec::T) where T <: OneDAbstractCellArray = prod(map(x -> (ismissing(x) ? "><" : (x ? "██" : "  ")),  cvec))
 Base.string(cvec::T) where T <: OneDCellArray = string_vec(cvec)  # to avoid ambiguity during dispatch, overload with custom method
 Base.string(cvec::T) where T <: OneDSolutionCellArray = string_vec(cvec)
@@ -54,8 +44,16 @@ function string_mat(cmat::T) where T <: TwoDAbstractCellArray
     s *= "\n" * "┗" * "━━"^m * "┛"
     s
 end
-Base.string(cmat::SolutionCellMatrix) = string_mat(cmat)  # to avoid ambiguity, overload with custom method
+Base.string(cmat::SolutionCellMatrix) = string_mat(cmat)  # to avoid ambiguity during dispatch, overload with custom method
 Base.string(cmat::T) where T <: TwoDAbstractCellArray = string_mat(cmat)
+
+istrue(x::CellState) = !ismissing(x) && x
+isfalse(x::CellState) = !ismissing(x) && !x
+isempty(x::CellState) = ismissing(x) || !x  # == !istrue(x)
+
+init_cvec(n::Int) = convert(CellVector, fill(missing, n))
+
+init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
 
 inbounds(cmat::T, i::Int, dim::Int) where T <: TwoDAbstractCellArray = (1 <= i) && (i <= size(cmat, dim))
 inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cmat, ij[1], 1) && inbounds(cmat, ij[2], 2)

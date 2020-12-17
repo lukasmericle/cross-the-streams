@@ -1,6 +1,4 @@
 export VectorStateCounter, MatrixStateCounter
-import Base: vcat, isnothing
-export       vcat, isnothing
 
 abstract type AbstractStateCounter end
 
@@ -27,12 +25,29 @@ function VectorStateCounter(m::Int; init::String="blank")
 end
 VectorStateCounter(cvec::T; init::String="blank") where T <: OneDCellArray = VectorStateCounter(length(cvec); init=init)
 
-MaybeVectorStateCounter = Union{Nothing, VectorStateCounter}
-
 cumul(counter::VectorStateCounter) = counter.cumul
 n(counter::VectorStateCounter) = counter.n
 
+MaybeVectorStateCounter = Union{Nothing, VectorStateCounter}
+
+mutable struct MatrixStateCounter <: AbstractStateCounter
+    rows::Vector{VectorStateCounter}
+    cols::Vector{VectorStateCounter}
+end
+MatrixStateCounter(n::Int, m::Int; init::String="blank") = MatrixStateCounter([VectorStateCounter(m; init=init) for _=1:n],
+                                                                              [VectorStateCounter(n; init=init) for _=1:m])
+
+rows(counter::MatrixStateCounter) = counter.rows
+cols(counter::MatrixStateCounter) = counter.cols
+
+Base.length(counter::VectorStateCounter) = Base.length(cumul(counter))
+
+Base.size(counter::VectorStateCounter) = (length(counter),)
+Base.size(counter::MatrixStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("matrix state counter has only two dimensions"))
+Base.size(counter::MatrixStateCounter) = (Base.size(counter, 1), Base.size(counter, 2))
+
 Base.isnothing(counter::VectorStateCounter) = false
+Base.isnothing(counter::MatrixStateCounter) = false
 
 function (Base.:+)(a::VectorStateCounter, b::VectorStateCounter)
     a.cumul[:] .+= b.cumul
@@ -55,20 +70,13 @@ Base.vcat(a::VectorStateCounter, b::Nothing) = nothing
 Base.vcat(b::Nothing, a::VectorStateCounter) = nothing
 Base.vcat(counters::Vararg{MaybeVectorStateCounter}) = prod(counters)
 
-mutable struct MatrixStateCounter <: AbstractStateCounter
-    rows::Vector{VectorStateCounter}
-    cols::Vector{VectorStateCounter}
-end
-MatrixStateCounter(n::Int, m::Int; init::String="blank") = MatrixStateCounter([VectorStateCounter(m; init=init) for _=1:n],
-                                                                              [VectorStateCounter(n; init=init) for _=1:m])
+num_states(counter::VectorStateCounter) = convert(BigInt, n(counter))
+num_states(counter::MatrixStateCounter) = prod(num_states.(rows(counter))) * prod(num_states.(cols(counter)))
 
-rows(counter::MatrixStateCounter) = counter.rows
-cols(counter::MatrixStateCounter) = counter.cols
+max_num_states(counter::VectorStateCounter) = 2 ^ convert(BigInt, length(counter))  # this is the number of states when `cluevec = [Asterisk()]`
+max_num_states(counter::MatrixStateCounter) = 4 ^ convert(BigInt, prod(size(counter)))  # if every row and col have the maximum number of states, this returns the value of the prod of all of them.
 
-Base.isnothing(counter::MatrixStateCounter) = false
-
-Base.size(counter::MatrixStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("matrix state counter has only two dimensions"))
-Base.size(counter::MatrixStateCounter) = (Base.size(counter, 1), Base.size(counter, 2))
+complexity(counter::T) where T <: AbstractStateCounter = BigFloat(num_states(counter) - 1) / BigFloat(max_num_states(counter) - 1)
 
 function odds_rc(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
     any(isone.(xy)) && return 1.0
@@ -85,13 +93,6 @@ function odds(counter::MatrixStateCounter)
     for j=1:m omat[2,:,j] .= odds(cols(counter)[j]) end
     mapslices(odds_rc, omat, dims=[1])[1,:,:]
 end
-
-num_states(counter::VectorStateCounter) = convert(BigInt, n(counter))
-max_num_states(counter::VectorStateCounter) = 2 ^ convert(BigInt, length(counter))  # this is the number of states when `cluevec = [Asterisk()]`
-num_states(counter::MatrixStateCounter) = prod(num_states.(rows(counter))) * prod(num_states.(cols(counter)))
-max_num_states(counter::MatrixStateCounter) = 4 ^ convert(BigInt, prod(size(counter)))  # if every row and col have the maximum number of states, this returns the value of the prod of all of them.
-
-complexity(counter::T) where T <: AbstractStateCounter = BigFloat(num_states(counter) - 1) / BigFloat(max_num_states(counter) - 1)
 
 entropy(p::T) where T <: AbstractFloat = (isone(p) || iszero(p)) ? 0.0 : -(p * log(p) + (1 - p) * log(1 - p)) / log(2)  # log(2) to normalize output between 0 and 1
 entropy(counter::T) where T <: AbstractStateCounter = mean(entropy.(odds(counter)))
