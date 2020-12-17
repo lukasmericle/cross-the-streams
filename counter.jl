@@ -1,8 +1,6 @@
 export VectorStateCounter, MatrixStateCounter
-import Base: vcat, isnothing, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
-export       vcat, isnothing, size, length, iterate, setindex, setindex!, getindex, firstindex, lastindex
-
-using Lazy: @forward
+import Base: vcat, isnothing
+export       vcat, isnothing
 
 abstract type AbstractStateCounter end
 
@@ -34,15 +32,6 @@ MaybeVectorStateCounter = Union{Nothing, VectorStateCounter}
 cumul(counter::VectorStateCounter) = counter.cumul
 n(counter::VectorStateCounter) = counter.n
 
-@forward VectorStateCounter.cumul size
-@forward VectorStateCounter.cumul length
-@forward VectorStateCounter.cumul iterate
-@forward VectorStateCounter.cumul setindex
-@forward VectorStateCounter.cumul setindex!
-@forward VectorStateCounter.cumul getindex
-@forward VectorStateCounter.cumul firstindex
-@forward VectorStateCounter.cumul lastindex
-
 Base.isnothing(counter::VectorStateCounter) = false
 
 function (Base.:+)(a::VectorStateCounter, b::VectorStateCounter)
@@ -70,10 +59,8 @@ mutable struct MatrixStateCounter <: AbstractStateCounter
     rows::Vector{VectorStateCounter}
     cols::Vector{VectorStateCounter}
 end
-function MatrixStateCounter(n::Int, m::Int; init::String="blank")
-    MatrixStateCounter([VectorStateCounter(m; init=init) for _=1:n],
-                       [VectorStateCounter(n; init=init) for _=1:m])
-end
+MatrixStateCounter(n::Int, m::Int; init::String="blank") = MatrixStateCounter([VectorStateCounter(m; init=init) for _=1:n],
+                                                                              [VectorStateCounter(n; init=init) for _=1:m])
 
 rows(counter::MatrixStateCounter) = counter.rows
 cols(counter::MatrixStateCounter) = counter.cols

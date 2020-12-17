@@ -4,8 +4,6 @@ export empty_neighbor_sites
 import Base: string
 export       string
 
-using Lazy: @forward
-
 CellState = Union{Bool, Missing}
 
 istrue(x::CellState) = !ismissing(x) && x

@@ -167,7 +167,7 @@ function Base.sort!(rcs::Vector{Tuple{Char,Int}}, counter::MatrixStateCounter)
     sort_ord = sortperm(vcat(map(n, rows(counter)[row_idxs]),   # get the order that the rcs should be in
                              map(n, cols(counter)[col_idxs])))  # (from fewest to most states, to encourage quickly acting on good information)
     rcs[:] .= @view vcat(map(r -> ('R', r), row_idxs),
-                             map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
+                         map(c -> ('C', c), col_idxs))[sort_ord]  # rewrite to the same array
 end
 
 function solve(pzl::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray

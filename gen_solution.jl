@@ -1,4 +1,5 @@
 export generate_solution
+
 using StatsBase: sample, Weights
 using Statistics: mean
 
