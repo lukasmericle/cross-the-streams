@@ -102,7 +102,7 @@ end
 num_states(counter::VectorStateCounter) = convert(BigInt, n(counter))
 max_num_states(counter::VectorStateCounter) = 2 ^ convert(BigInt, length(counter))  # this is the number of states when `cluevec = [Asterisk()]`
 num_states(counter::MatrixStateCounter) = prod(num_states.(rows(counter))) * prod(num_states.(cols(counter)))
-max_num_states(counter::MatrixStateCounter) = 2 ^ convert(BigInt, length(rows(counter)) + length(cols(counter)))
+max_num_states(counter::MatrixStateCounter) = 4 ^ convert(BigInt, prod(size(counter)))  # if every row and col have the maximum number of states, this returns the value of the prod of all of them.
 
 complexity(counter::T) where T <: AbstractStateCounter = BigFloat(num_states(counter) - 1) / BigFloat(max_num_states(counter) - 1)
 
