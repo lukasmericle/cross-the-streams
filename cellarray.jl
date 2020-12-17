@@ -60,8 +60,8 @@ init_cvec(n::Int) = convert(CellVector, fill(missing, n))
 
 init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
 
-inbounds(cmat::T, i::Int, dim::Int) where T <: TwoDAbstractCellArray = (1 <= i) && (i <= size(cmat, dim))
-inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cmat, ij[1], 1) && inbounds(cmat, ij[2], 2)
+@views inbounds(cmat::T, i::Int, dim::Int) where T <: TwoDAbstractCellArray = (1 <= i) && (i <= size(cmat, dim))
+@views inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cmat, ij[1], 1) && inbounds(cmat, ij[2], 2)
 
 Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
 
@@ -83,8 +83,15 @@ Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
     false
 end
 
-@views function empty_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
-    filter(
-        iijj -> (inbounds(cmat, iijj) && isempty(cmat[iijj])),
-        broadcast(vnn -> ij + vnn, VON_NEUMANN_NEIGHBORHOOD_2D))
+function neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
+    filter(iijj -> inbounds(cmat, iijj),
+           broadcast(vnn -> ij + vnn, VON_NEUMANN_NEIGHBORHOOD_2D))
+end
+
+function empty_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
+    filter(isempty, neighbor_sites(cmat, ij))
+end
+
+function filled_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
+    filter(istrue, neighbor_sites(cmat, ij))
 end

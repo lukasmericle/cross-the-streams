@@ -199,20 +199,31 @@ end
 
 issmat(cmat::T) where T <: TwoDAbstractCellArray = !any(ismissing.(cmat))
 
-function iscontiguous(cmat::T) where T <: TwoDSolutionCellArray
+@views function iscontiguous(cmat::T) where T <: TwoDSolutionCellArray
     start_idx = findfirst(istrue.(cmat))
-    # TODO: flood fill to determine whether all trues in cmat are contiguous
-    true
+    isnothing(start_idx) && return false  # zero connected components
+    ijs = [start_idx]
+    c = 1
+    while (length(ijs) > 0)
+        ij = popfirst!(ijs)
+        next_ijs = filled_neighbor_sites(cmat, ij)
+        if (length(next_ijs) > 0)
+            append!(ijs, next_ijs)
+            unique!(ijs)
+        end
+        c += 1
+    end
+    (count(istrue(cmat)) === c)  # true if there is one connected component
 end
 
-function check_cmat(puzzle::Puzzle, cmat::T) where T <: TwoDAbstractCellArray
+@views function check_cmat(puzzle::Puzzle, cmat::T) where T <: TwoDAbstractCellArray
     issmat(cmat) && issolution(puzzle, convert(SolutionCellMatrix, cmat))  # this version not needed if we do our bookkeeping right
 end
-function check_cmat(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDAbstractCellArray
+@views function check_cmat(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter) where T <: TwoDAbstractCellArray
     issmat(cmat) && issolution(puzzle, convert(SolutionCellMatrix, cmat), counter)
 end
 
-function issolution(puzzle::Puzzle, cmat::T) where T <: TwoDSolutionCellArray
+@views function issolution(puzzle::Puzzle, cmat::T) where T <: TwoDSolutionCellArray
     !iscontiguous(cmat) && return false    # this version not needed if we do our bookkeeping right
     counter = MatrixStateCounter(cmat, puzzle)
     issolution(puzzle, cmat, counter)
