@@ -28,7 +28,7 @@ function minreq_cells(cluevec_ints::T, n_qmks::Int) where T <: AbstractClueVecto
 end
 
 function space_for_ints(cluevec_ints_after::T) where T <: AbstractClueVector
-    (length(cluevec_ints_after) == 0) && return 0
+    (length(cluevec_ints_after) === 0) && return 0
     sum(cluevec_ints_after) + length(cluevec_ints_after)
 end
 
@@ -42,7 +42,7 @@ end
     Uses dynamic programming and branch-and-bound to test and accumulate
     all possible configurations of cells based on current col state and col description.
     """
-    if (length(cluevec) == 0)
+    if (length(cluevec) === 0)
         if any(skipmissing(cellvec))
             return nothing  # if any trues but no clues, bound this branch
         else
@@ -56,7 +56,7 @@ end
     if (n_reqd_cells > length(cellvec))
         return nothing  # if the clues won't fit into the grid, bound this branch
     elseif (length(cellvec) === 0)
-        return VectorStateCounter(cellvec; init="empty")  # reach this branch if (length(cellvec) == 0) and cluevec has only Asterisk in it; no-op
+        return VectorStateCounter(cellvec; init="empty")  # reach this branch if (length(cellvec) === 0) and cluevec has only Asterisk in it; no-op
     end
     counter = VectorStateCounter(cellvec; init="blank")
     if (length(all_ints) > 0)
@@ -73,7 +73,7 @@ end
             cellvec_middle = cellvec[pos:pos+(run_length-1)]
             any(isfalse.(cellvec_middle)) && continue  # continue if filled cell(s) should be empty
             counter_middle = VectorStateCounter(cellvec_middle; init="full")
-            if (pos == 1)
+            if (pos === 1)
                 counter_before = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos-1]) && continue  # continue if empty cell should be filled
@@ -82,7 +82,7 @@ end
                 isnothing(counter_before) && continue
                 counter_before = counter_before * VectorStateCounter(1; init="empty")
             end
-            if (pos == last_pos_apriori)
+            if (pos === last_pos_apriori)
                 counter_after = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos+(run_length-1)+1]) && continue  # continue if empty cell should be filled

@@ -8,16 +8,16 @@ mutable struct VectorStateCounter <: AbstractStateCounter
 end
 VectorStateCounter() = nothing
 function VectorStateCounter(m::Int; init::String="blank")
-    if (init == "blank")
+    if (init === "blank")
         cumul = zeros(Int, m)
         n = 0
-    elseif (init == "empty")
+    elseif (init === "empty")
         cumul = zeros(Int, m)
         n = 1
-    elseif (init == "full")
+    elseif (init === "full")
         cumul = ones(Int, m)
         n = 1
-    elseif (init == "askmissing")
+    elseif (init === "askmissing")
         cumul = fill(2^(m-1), m)
         n = 2^m
     end
@@ -43,7 +43,7 @@ cols(counter::MatrixStateCounter) = counter.cols
 Base.length(counter::VectorStateCounter) = Base.length(cumul(counter))
 
 Base.size(counter::VectorStateCounter) = (length(counter),)
-Base.size(counter::MatrixStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("matrix state counter has only two dimensions"))
+Base.size(counter::MatrixStateCounter, dim::Int) = (dim === 1) ? length(rows(counter)) : ((dim === 2) ? length(cols(counter)) : error("matrix state counter has only two dimensions"))
 Base.size(counter::MatrixStateCounter) = (Base.size(counter, 1), Base.size(counter, 2))
 
 Base.isnothing(counter::VectorStateCounter) = false

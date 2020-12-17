@@ -20,7 +20,7 @@ end
 rows(pzl::Puzzle) = pzl.rows
 cols(pzl::Puzzle) = pzl.cols
 
-Base.size(pzl::Puzzle, dim::Int) = (dim == 1) ? length(rows(pzl)) : ((dim == 2) ? length(cols(pzl)) : error("puzzle has only two dimensions"))
+Base.size(pzl::Puzzle, dim::Int) = (dim === 1) ? length(rows(pzl)) : ((dim === 2) ? length(cols(pzl)) : error("puzzle has only two dimensions"))
 Base.size(pzl::Puzzle) = (Base.size(pzl, 1), Base.size(pzl, 2))
 
 Base.string(n::QuestionMark) = "?"

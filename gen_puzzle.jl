@@ -22,7 +22,7 @@ function clean!(cvec::T) where T <: AbstractClueVector
     (length(all_asks) < 2) && return
     @. dist_to_next_ask = all_asks[2:end] - all_asks[1:end-1]
     duplicates = findall(dist_to_next_ask .=== 1)
-    (length(duplicates) == 0) && return
+    (length(duplicates) === 0) && return
     deleteat!(cvec, duplicates)
 end
 
@@ -36,9 +36,9 @@ num2ask!(cvec::T) where T <: AbstractClueVector = (cvec[rand(1:length(cvec))] = 
 function merge_num_ask!(cvec::T) where T <: AbstractClueVector
     (length(cvec) < 2) && return
     all_asks = findall(isa.(cvec, Asterisk))
-    (length(all_asks) == 0) && return
+    (length(all_asks) === 0) && return
     merge_candidates = filter(x->inbounds(cvec, x), VON_NEUMANN_NEIGHBORHOOD_1D .+ rand(all_asks))
-    (length(merge_candidates) == 0) && return
+    (length(merge_candidates) === 0) && return
     deleteat!(cvec, rand(merge_candidates))
 end
 
