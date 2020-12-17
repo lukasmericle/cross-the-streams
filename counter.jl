@@ -10,26 +10,23 @@ mutable struct VectorStateCounter <: AbstractStateCounter
     cumul::Array{Int, 1}
     n::Int
 end
-
+VectorStateCounter() = NaN
 function VectorStateCounter(m::Int; init::String="blank")
-    if init == "blank"
+    if (init == "blank")
         cumul = zeros(Int, m)
         n = 0
-    elseif init == "empty"
+    elseif (init == "empty")
         cumul = zeros(Int, m)
         n = 1
-    elseif init == "full"
+    elseif (init == "full")
         cumul = ones(Int, m)
         n = 1
-    elseif init == "askmissing"
-        cumul = Vector{Int}(undef, m)
-        fill!(cumul, 2^(m-1))
+    elseif (init == "askmissing")
+        cumul = fill(2^(m-1), m)
         n = 2^m
     end
     VectorStateCounter(cumul, n)
 end
-
-VectorStateCounter() = NaN
 VectorStateCounter(cvec::T; init::String="blank") where T <: OneDCellArray = VectorStateCounter(length(cvec); init=init)
 
 cumul(counter::VectorStateCounter) = counter.cumul
@@ -43,6 +40,8 @@ n(counter::VectorStateCounter) = counter.n
 @forward VectorStateCounter.cumul getindex
 @forward VectorStateCounter.cumul firstindex
 @forward VectorStateCounter.cumul lastindex
+
+Base.isnan(counter::VectorStateCounter) = false
 
 function Base.vcat(a::VectorStateCounter, b::VectorStateCounter)
     (length(a) === 0) && return b
@@ -64,24 +63,21 @@ end
 
 (Base.:*)(a::Union{T, VectorStateCounter}, b::Union{T, VectorStateCounter}) where T <: AbstractFloat = Base.vcat(a, b)
 
-Base.vcat(counters::Vararg{VectorStateCounter}) = prod(counters)
-
-Base.isnan(counter::VectorStateCounter) = false
+Base.vcat(counters::Vararg{Union{T, VectorStateCounter}}) = prod(counters)
 
 mutable struct MatrixStateCounter <: AbstractStateCounter
     rows::Vector{VectorStateCounter}
     cols::Vector{VectorStateCounter}
 end
-
-rows(counter::MatrixStateCounter) = counter.rows
-cols(counter::MatrixStateCounter) = counter.cols
-
 function MatrixStateCounter(n::Int, m::Int; init::String="blank")
     MatrixStateCounter([VectorStateCounter(m; init=init) for _=1:n],
                        [VectorStateCounter(n; init=init) for _=1:m])
 end
 
-Base.size(counter::MatrixStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("grid state counter has only two dimensions"))
+rows(counter::MatrixStateCounter) = counter.rows
+cols(counter::MatrixStateCounter) = counter.cols
+
+Base.size(counter::MatrixStateCounter, dim::Int) = (dim == 1) ? length(rows(counter)) : ((dim == 2) ? length(cols(counter)) : error("matrix state counter has only two dimensions"))
 Base.size(counter::MatrixStateCounter) = (Base.size(counter, 1), Base.size(counter, 2))
 
 function odds_rowcol(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
@@ -92,20 +88,15 @@ function odds_rowcol(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
 end
 
 odds(counter::VectorStateCounter) = cumul(counter) ./ n(counter)
-
 function odds(counter::MatrixStateCounter)
     n, m = size(counter)
     omat = Array{Float64}(undef, 2, n, m)
-    for i=1:n
-        omat[1,i,:] .= odds(rows(counter)[i])
-    end
-    for j=1:m
-        omat[2,:,j] .= odds(cols(counter)[j])
-    end
+    for i=1:n omat[1,i,:] .= odds(rows(counter)[i]) end
+    for j=1:m omat[2,:,j] .= odds(cols(counter)[j]) end
     mapslices(odds_rowcol, omat, dims=[1])[1,:,:]
 end
 
-entropy(p::T) where T <: AbstractFloat = (isone(p) || iszero(p)) ? 0.0 : -(p * log(p) + (1 - p) * log(1 - p))
+entropy(p::T) where T <: AbstractFloat = (isone(p) || iszero(p)) ? 0.0 : -(p * log(p) + (1 - p) * log(1 - p)) / log(2)  # log(2) to normalize output between 0 and 1
 entropy(counter::T) where T <: AbstractStateCounter = mean(entropy.(odds(counter)))
 
 complexity(counter::VectorStateCounter) = n(counter)

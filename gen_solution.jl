@@ -1,5 +1,4 @@
 export generate_solution
-
 using StatsBase: sample, Weights
 using Statistics: mean
 
@@ -20,7 +19,7 @@ end
             for v=1:k
                 jj = j + (v - 1) - kk
                 !inbounds(smat, jj, 2) && continue
-                smat[ii, jj] && (c += kernel[u,v])
+                smat[ii, jj] && (c += kernel[u, v])
             end
         end
     end
@@ -51,34 +50,20 @@ function random_skip(smat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
 end
 
 function generate_solution(n::Int, m::Int)
-
     smat = fill(false, n, m)
-
     ijs = TwoDCoord[(rand(1:n), rand(1:m))]
     kernel = make_kernel(smat)
-
     while (length(ijs) > 0)
-
         idx = choose_next_site(smat, kernel, ijs)
         ij = splice!(ijs, idx)
-
-        # skip (i, j) if crowded by 3 other true cells or we want to randomly skip it
         (iscrowded(smat, ij) || random_skip(smat, ij)) && continue
-
-        # if we get here, flip site to true
-        smat[ij...] = true
-
-        # get empty neighbors
+        smat[ij...] = true  # if we get here, flip site to true
         next_ijs = empty_neighbor_sites(smat, ij)
         if (length(next_ijs) > 0)
             append!(ijs, next_ijs)
             unique!(ijs)
         end
-
     end
-
     smat
-
 end
-
 generate_solution(n::Int) = generate_solution(n, n)

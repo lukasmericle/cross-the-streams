@@ -54,8 +54,7 @@ function init_cvec(n::Int)
 end
 
 string_vec(cvec::T) where T <: OneDAbstractCellArray = prod(map(x -> (ismissing(x) ? "><" : (x ? "██" : "  ")),  cvec))
-
-Base.string(cvec::SolutionCellVector) = string_vec(cvec)  # to avoid ambiguity, overload with custom method
+Base.string(cvec::T) where T <: OneDCellArray = string_vec(cvec)  # to avoid ambiguity, overload with custom method
 Base.string(cvec::T) where T <: OneDSolutionCellArray = string_vec(cvec)
 
 function string_mat(cmat::T) where T <: TwoDAbstractCellArray
@@ -67,7 +66,6 @@ function string_mat(cmat::T) where T <: TwoDAbstractCellArray
     s *= "\n" * "┗" * "━━"^m * "┛"
     s
 end
-
 Base.string(cmat::SolutionCellMatrix) = string_mat(cmat)  # to avoid ambiguity, overload with custom method
 Base.string(cmat::T) where T <: TwoDAbstractCellArray = string_mat(cmat)
 

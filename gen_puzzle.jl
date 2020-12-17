@@ -7,7 +7,6 @@ export generate_puzzle
 ## * some way to compute or approximate the "entropy" of the solution path
 ## or just tune a stochastic algorithm to produce decent results, and curate by hand
 
-
 function mutate!(cvec::T) where T <: AbstractClueVector
     # replace an integer with a question mark
     # replace a numeral with an asterisk
@@ -29,7 +28,7 @@ end
 
 function int2qmk!(cvec::T) where T <: AbstractClueVector
     all_ints = findall(isa.(cvec, Int))
-    (length(all_ints) > 0) && (cvec[rand(all_ints)] = QuestionMark())
+    ((length(all_ints) > 0) && (cvec[rand(all_ints)] = QuestionMark()))
 end
 
 num2ask!(cvec::T) where T <: AbstractClueVector = (cvec[rand(1:length(cvec))] = Asterisk())
@@ -38,7 +37,7 @@ function merge_num_ask!(cvec::T) where T <: AbstractClueVector
     (length(cvec) < 2) && return
     all_asks = findall(isa.(cvec, Asterisk))
     (length(all_asks) == 0) && return
-    merge_candidates = filter(x->inbounds(cvec, x), rand(all_asks) .+ VON_NEUMANN_NEIGHBORHOOD_1D)
+    merge_candidates = filter(x->inbounds(cvec, x), VON_NEUMANN_NEIGHBORHOOD_1D .+ rand(all_asks))
     (length(merge_candidates) == 0) && return
     deleteat!(cvec, rand(merge_candidates))
 end
