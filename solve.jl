@@ -184,9 +184,9 @@ end
 @views function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
     this_odds = odds(counter)
     missing_cmat = ismissing.(cmat)
-    true_updates = isone.(this_odds) .& missing_cmat
-    false_updates = iszero.(this_odds) .& missing_cmat
+    true_updates = isone.(this_odds) .& missing_cmat .&  .!iscrowded(cmat)
     cmat[true_updates] .= true
+    false_updates = iszero.(this_odds) .& missing_cmat
     cmat[false_updates] .= false
     findall(true_updates .| false_updates)  # returns ijs where updates occurred this round
 end
@@ -203,17 +203,18 @@ issmat(cmat::T) where T <: TwoDAbstractCellArray = !any(ismissing.(cmat))
     start_idx = findfirst(istrue.(cmat))
     isnothing(start_idx) && return false  # zero connected components
     ijs = [start_idx]
-    c = 1
+    visited = TwoDCoord[]
     while (length(ijs) > 0)
         ij = popfirst!(ijs)
+        push!(visited, ij)
         next_ijs = filled_neighbor_sites(cmat, ij)
         if (length(next_ijs) > 0)
+            filter!(ij -> !in(ij, visited), next_ijs)
             append!(ijs, next_ijs)
             unique!(ijs)
         end
-        c += 1
     end
-    (count(istrue(cmat)) === c)  # true if there is one connected component
+    (count(cmat) === length(visited))  # true if there is one connected component
 end
 
 @views function check_cmat(puzzle::Puzzle, cmat::T) where T <: TwoDAbstractCellArray
@@ -245,7 +246,6 @@ end
     solve(puzzle, cmat, counter, [ij])
 end
 @views function solve(puzzle::Puzzle, cmat::T, counter::MatrixStateCounter, ijs::Vector{TwoDCoord}) where T <: TwoDCellArray
-    #TODO: add guardrails using iscrowded()
     rcs = ijs2rcs(ijs)
     sort!(rcs, counter)
     history = ijs
@@ -271,6 +271,7 @@ end
     while !all(isone.(uncertainty))
         ent, ij = findmin(uncertainty)
         uncertainty[ij] = 1.0  # "remove" it from the "list"
+        iscrowded(cmat, ij) && continue
         initial_guess = (this_odds[ij] >= 0.5)
         cmat = solve(puzzle, cmat, counter, ij, initial_guess)  # calling solve is a no-op when the guess doesn't pan out
         if ismissing(cmat[ij])

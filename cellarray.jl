@@ -25,6 +25,7 @@ TwoDSolutionCellArray = Union{SolutionCellMatrix, SolutionCellMatrixMatrixView}
 
 OneDAbstractCellArray = Union{OneDCellArray, OneDSolutionCellArray}
 TwoDAbstractCellArray = Union{TwoDCellArray, TwoDSolutionCellArray}
+OneOrTwoDAbstractCellArray = Union{OneDAbstractCellArray, TwoDAbstractCellArray}
 
 OneDCoord = CartesianIndex{1}
 TwoDCoord = CartesianIndex{2}
@@ -63,6 +64,8 @@ init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
 @views inbounds(cmat::T, i::Int, dim::Int) where T <: TwoDAbstractCellArray = (1 <= i) && (i <= size(cmat, dim))
 @views inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cmat, ij[1], 1) && inbounds(cmat, ij[2], 2)
 
+@views Base.count(cmat::T) where T <: OneOrTwoDAbstractCellArray = sum(istrue, cmat)
+
 Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
 
 @views function iscrowded(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray
@@ -70,7 +73,7 @@ Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
     Return true if any of the two-by-two's which contain (i,j)
     have three or more filled cells.
     """
-    istrue(cmat[ij]) && error("This cell is already filled")
+    istrue(cmat[ij]) && return true  # trivially true
     let (i, j) = Tuple(ij)
         for ii=(i-1):i
             !((1 <= ii) && (ii+1 <= size(cmat, 1))) && continue
@@ -82,6 +85,8 @@ Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
     end
     false
 end
+@views iscrowded(cmat::T, ijs::Vector{TwoDCoord}) where T <: TwoDAbstractCellArray = map(ij -> iscrowded(cmat, ij), ijs)
+@views iscrowded(cmat::T) where T <: TwoDAbstractCellArray = map(ij -> iscrowded(cmat, ij), CartesianIndices(fill(1, size(cmat))))
 
 function neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
     filter(iijj -> inbounds(cmat, iijj),
@@ -89,9 +94,9 @@ function neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
 end
 
 function empty_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
-    filter(isempty, neighbor_sites(cmat, ij))
+    filter(x -> isempty(cmat[x]), neighbor_sites(cmat, ij))
 end
 
 function filled_neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
-    filter(istrue, neighbor_sites(cmat, ij))
+    filter(x -> istrue(cmat[x]), neighbor_sites(cmat, ij))
 end
