@@ -6,7 +6,7 @@ using Statistics: mean
 function construct_gaussian_kernel(k::T) where T <: Real
     k = max(3, trunc(Int8, k))
     iseven(k) && (k -= 1)  # k should be odd so that the kernel is always centered on a cell
-    v = float.(map(x->binomial(k-1,x), 0:(k-1)))
+    v = float.(map(x -> binomial(k-1,x), 0:(k-1)))
     kernel = v * v'  # outer product
     kernel ./= sum(kernel)
 end
@@ -39,7 +39,7 @@ NEXT_SITE_COEFF = BASE_COEFF ^ (1 + log(666e-2))
     Chooses the next site based on weights derived from
     the local density of true cells in the current state.
     """
-    sample(1:length(ijs), Weights(1 ./ (map(ij->convolve(smat, kernel, ij), ijs) .^ NEXT_SITE_COEFF)))
+    sample(1:length(ijs), Weights(1 ./ (map(ij -> convolve(smat, kernel, ij), ijs) .^ NEXT_SITE_COEFF)))
 end
 
 RAND_SKIP_COEFF = BASE_COEFF ^ (1 - log1p(55555e-6))

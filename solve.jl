@@ -82,12 +82,11 @@ end
     counter = VectorStateCounter(cellvec; init="blank")
     if (length(all_ints) > 0)
         first_int = all_ints[1]
-        cluevec_before = cluevec[1:first_int-1]
+        (first_int > length(cellvec)) && return nothing
         run_length = cluevec[first_int]
-        cluevec_after = cluevec[first_int+1:end]
+        last_pos_apriori = length(cellvec) - (run_length - 1)  # minus 1 because ranges are inclusive in Julia
         space_for_ints_after = space_for_ints(cluevec[all_ints[2:end]])
         space_for_qmks_before, space_for_qmks_after = space_for_qmks(all_qmks, first_int)
-        last_pos_apriori = length(cellvec) - (run_length - 1)  # minus 1 because ranges are inclusive in Julia
         first_pos = 1 + space_for_qmks_before
         last_pos = last_pos_apriori - (space_for_ints_after + space_for_qmks_after)
         for pos=first_pos:last_pos   # if first_pos > last_pos, this for loop is skipped and counter is returned blank (thus this branch is bounded)
@@ -98,8 +97,7 @@ end
                 counter_before = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos-1]) && continue  # continue if empty cell should be filled
-                cellvec_before = cellvec[1:pos-2]
-                counter_before = count_states(cellvec_before, cluevec_before)
+                counter_before = count_states(cellvec[1:pos-2], cluevec[1:first_int-1])
                 isnothing(counter_before) && continue
                 counter_before = counter_before * VectorStateCounter(1; init="empty")
             end
@@ -107,14 +105,15 @@ end
                 counter_after = VectorStateCounter(0; init="empty")
             else
                 istrue(cellvec[pos+(run_length-1)+1]) && continue  # continue if empty cell should be filled
-                cellvec_after = cellvec[pos+(run_length-1)+2:end]
-                counter_after = count_states(cellvec_after, cluevec_after)
+                counter_after = count_states(cellvec[pos+(run_length-1)+2:end], cluevec[first_int+1:end])
                 isnothing(counter_after) && continue
                 counter_after = VectorStateCounter(1; init="empty") * counter_after
             end
             counter += vcat(counter_before, counter_middle, counter_after)
         end
     elseif (length(all_qmks) > 0)
+        all(cellvec) && return VectorStateCounter(cellvec; init="full")
+        all(.!cellvec) && return nothing
         first_qmk = all_qmks[1]
         space_for_qmks_after = (length(all_qmks) > 0) ? (2 * (length(all_qmks) - 1)) : 0
         max_len = length(cellvec) - space_for_qmks_after
@@ -184,7 +183,7 @@ end
 @views function update!(cmat::T, counter::MatrixStateCounter) where T <: TwoDCellArray
     this_odds = odds(counter)
     missing_cmat = ismissing.(cmat)
-    true_updates = isone.(this_odds) .& missing_cmat .&  .!iscrowded(cmat)
+    true_updates = isone.(this_odds) .& missing_cmat .& .!iscrowded(cmat)
     cmat[true_updates] .= true
     false_updates = iszero.(this_odds) .& missing_cmat
     cmat[false_updates] .= false
