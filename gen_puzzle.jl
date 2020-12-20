@@ -40,12 +40,11 @@ end
     (length(cvec) < 2) && return
     all_asks = findall(isa.(cvec, Asterisk))
     (length(all_asks) === 0) && return
-    m = 0
-    while (m === 0)
+    merge_candidates = OneDCoord[]
+    while (length(merge_candidates) === 0)
         this_ask = OneDCoord(rand(all_asks))
         merge_candidates = filter(x -> inbounds(cvec, x),
                                   broadcast(vnn -> vnn + this_ask, VON_NEUMANN_NEIGHBORHOOD_1D))
-        m = length(merge_candidates)
     end
     deleteat!(cvec, rand(merge_candidates))
 end
@@ -70,13 +69,26 @@ end
 @views get_puzzle_cols(smat::T) where T <: TwoDSolutionCellArray = map(get_puzzle_col, eachcol(smat))
 @views get_puzzle_rows(smat::T) where T <: TwoDSolutionCellArray = map(get_puzzle_col, eachrow(smat))
 
-function generate_puzzle(smat::T; num_mutations::Int=0) where T <: TwoDSolutionCellArray
-    prows = get_puzzle_rows(smat)
-    pcols = get_puzzle_cols(smat)
-    for i=1:num_mutations
-        rand(Bool) ? mutate!(rand(prows)) : mutate!(rand(pcols))
+Puzzle(smat::T) where T <: TwoDSolutionCellArray = Puzzle(get_puzzle_rows(smat), get_puzzle_cols(smat))
+
+function generate_puzzle(smat::T; difficulty::S=0.0) where {T <: TwoDSolutionCellArray, S <: AbstractFloat}
+    puzzle = Puzzle(smat)
+    counter = MatrixStateCounter(puzzle)
+    initial_num_states = convert(BigFloat, num_states(counter))
+    dummy_row = convert(CellVector, fill(missing, size(puzzle, 2)))
+    dummy_col = convert(CellVector, fill(missing, size(puzzle, 1)))
+    while ((convert(BigFloat, num_states(counter)) / initial_num_states) < exp(difficulty))
+        if rand(Bool)
+            i = rand(1:size(puzzle, 1))
+            mutate!(rows(puzzle)[i])
+            recount!(rows(counter)[i], dummy_row, rows(puzzle)[i])
+        else
+            j = rand(1:size(puzzle, 2))
+            mutate!(cols(puzzle)[j])
+            recount!(cols(counter)[j], dummy_col, cols(puzzle)[j])
+        end
     end
-    Puzzle(prows, pcols)
+    puzzle
 end
-generate_puzzle(n::Int, m::Int; num_mutations::Int=0) = generate_puzzle(generate_solution(n, m), num_mutations=num_mutations)
-generate_puzzle(n::Int; num_mutations::Int=0) = generate_puzzle(n, n, num_mutations=num_mutations)
+generate_puzzle(n::Int, m::Int; difficulty::T=1.0) where T <: AbstractFloat = generate_puzzle(generate_solution(n, m), difficulty=difficulty)
+generate_puzzle(n::Int; difficulty::T=1.0) where T <: AbstractFloat = generate_puzzle(n, n, difficulty=difficulty)

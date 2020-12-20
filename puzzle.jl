@@ -33,3 +33,5 @@ function Base.string(pzl::Puzzle)
     s *= join(string.(cols(pzl)), "\n")
     s
 end
+
+@views inbounds(cvec::T, i::OneDCoord) where T <: AbstractClueVector = (1 <= i[1]) && (i[1] <= length(cvec))
