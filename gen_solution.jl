@@ -1,8 +1,5 @@
 export generate_solution
 
-using StatsBase: sample, Weights
-using Statistics: mean
-
 function construct_gaussian_kernel(k::T) where T <: Real
     k = max(3, trunc(Int8, k))
     iseven(k) && (k -= 1)  # k should be odd so that the kernel is always centered on a cell

@@ -83,17 +83,16 @@ complexity(counter::T) where T <: AbstractStateCounter = BigFloat(num_states(cou
 
 function odds_rc(xy::T) where {S <: AbstractFloat, T <: AbstractArray{S,1}}
     any(isone.(xy)) && return 1.0
-    any(iszero.(xy)) && return 0.0
+    any(iszero.(xy)) && return 0.0  # is a check better than just multiplying by zero?
     prod(xy)
     # sqrt(prod(xy))  # perhaps the geometric mean is better for this application?
 end
 
 odds(counter::VectorStateCounter) = cumul(counter) ./ n(counter)
 function odds(counter::MatrixStateCounter)
-    n, m = size(counter)
-    omat = Array{Float64}(undef, 2, n, m)
-    for i=1:n omat[1,i,:] .= odds(rows(counter)[i]) end
-    for j=1:m omat[2,:,j] .= odds(cols(counter)[j]) end
+    omat = Array{Float64}(undef, 2, size(counter)...)
+    for (i,row)=enumerate(rows(counter)) omat[1,i,:] .= odds(row) end
+    for (j,col)=enumerate(cols(counter)) omat[2,:,j] .= odds(col) end
     mapslices(odds_rc, omat, dims=[1])[1,:,:]
 end
 

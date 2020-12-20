@@ -61,6 +61,7 @@ init_cvec(n::Int) = convert(CellVector, fill(missing, n))
 
 init_cmat(n::Int, m::Int) = convert(CellMatrix, fill(missing, n, m))
 
+@views inbounds(cvec::T, i::OneDCoord) where T <: OneDAbstractCellArray = (1 <= i[1]) && (i[1] <= length(cvec))
 @views inbounds(cmat::T, i::Int, dim::Int) where T <: TwoDAbstractCellArray = (1 <= i) && (i <= size(cmat, dim))
 @views inbounds(cmat::T, ij::TwoDCoord) where T <: TwoDAbstractCellArray = inbounds(cmat, ij[1], 1) && inbounds(cmat, ij[2], 2)
 
@@ -85,8 +86,8 @@ Base.isnothing(cmat::T) where T <: TwoDAbstractCellArray = false
     end
     false
 end
-@views iscrowded(cmat::T, ijs::Vector{TwoDCoord}) where T <: TwoDAbstractCellArray = map(ij -> iscrowded(cmat, ij), ijs)
-@views iscrowded(cmat::T) where T <: TwoDAbstractCellArray = map(ij -> iscrowded(cmat, ij), CartesianIndices(fill(1, size(cmat))))
+@views iscrowded(cmat::TC, ijs::TA) where {TC <: TwoDAbstractCellArray, TA <: Union{AbstractArray{TwoDCoord}, CartesianIndices}} = map(ij -> iscrowded(cmat, ij), ijs)
+@views iscrowded(cmat::T) where T <: TwoDAbstractCellArray = iscrowded(cmat, CartesianIndices(fill(1, size(cmat))))
 
 function neighbor_sites(cmat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
     filter(iijj -> inbounds(cmat, iijj),

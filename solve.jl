@@ -3,8 +3,8 @@ export solve
 @views function MatrixStateCounter(puzzle::Puzzle)  # initializes based on puzzle description assuming grid is blank
     dummy_row = init_cvec(size(puzzle, 2))
     dummy_col = init_cvec(size(puzzle, 1))
-    MatrixStateCounter(map(i -> count_states(dummy_row, rows(puzzle)[i]), 1:size(puzzle, 1)),
-                       map(j -> count_states(dummy_col, cols(puzzle)[j]), 1:size(puzzle, 2)))
+    MatrixStateCounter(map(row -> count_states(dummy_row, row), rows(puzzle)),
+                       map(col -> count_states(dummy_col, col), cols(puzzle)))
 end
 @views function MatrixStateCounter(cmat::T, puzzle::Puzzle) where T <: TwoDAbstractCellArray  # initializes based on puzzle description and current state of grid
     MatrixStateCounter(map(i -> count_states(cmat[i,:], rows(puzzle)[i]), 1:size(cmat, 1)),
@@ -112,8 +112,8 @@ end
             counter += vcat(counter_before, counter_middle, counter_after)
         end
     elseif (length(all_qmks) > 0)
-        all(cellvec) && return VectorStateCounter(cellvec; init="full")
-        all(.!cellvec) && return nothing
+        all(istrue, cellvec) && return VectorStateCounter(cellvec; init="full")
+        all(isfalse, cellvec) && return nothing
         first_qmk = all_qmks[1]
         space_for_qmks_after = (length(all_qmks) > 0) ? (2 * (length(all_qmks) - 1)) : 0
         max_len = length(cellvec) - space_for_qmks_after
@@ -125,9 +125,9 @@ end
             cluevec_middle[1] += 1  # a question mark represents a cell run of length 1 or more
         end
     elseif (length(all_asks) > 0)
-        all(ismissing.(cellvec)) && return VectorStateCounter(cellvec; init="askmissing")
-        all(cellvec) && return VectorStateCounter(cellvec; init="full")
-        all(.!cellvec) && return VectorStateCounter(cellvec; init="empty")
+        all(ismissing, cellvec) && return VectorStateCounter(cellvec; init="askmissing")
+        all(istrue, cellvec) && return VectorStateCounter(cellvec; init="full")
+        all(isfalse, cellvec) && return VectorStateCounter(cellvec; init="empty")
         first_ask = all_asks[1]
         cluevec_before = cluevec[1:first_ask-1]
         cluevec_middle = QuestionMark[]
@@ -261,7 +261,6 @@ end
             unique!(rcs)
             sort!(rcs, counter)
         end
-        println(string(cmat))
     end
     # once we're out of deterministic updates, we make a best guess to continue and backtrack if it doesn't work out
     this_odds = odds(counter)
@@ -277,7 +276,6 @@ end
             cmat = solve(puzzle, cmat, counter, ij, !initial_guess)
             ismissing(cmat[ij]) && continue  # neither guess worked, so try the next value
         end
-        println(string(cmat))
         check_cmat(puzzle, cmat, counter) && return convert(SolutionCellMatrix, cmat)
     end
     undo!(cmat, counter, puzzle, history)  # if we've gone through the whole list and still can't find a good result, then we need to backtrack
