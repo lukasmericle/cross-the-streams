@@ -12,3 +12,12 @@ This implementation uses dynamic programming to estimate grid cell occupancy pro
 The solver in general is agnostic to whole-grid state, *i.e.*, it considers grid cell state probabilities independently, and considers all rows/columns independent from all other rows/columns. Notably, one thing this solver does *not* do right now (in the case of Cross The Streams) is some kind of look-ahead approach to ensure only one connected component of filled cells.
 
 As this implements a dynamic-programming-based tree search, there are certain conditions and constraints which do not necessarily inform the search, instead only filtering infeasible solutions *ex post facto*. One way to improve this would be some kind of SAT or general constraint solver. The difficulty then is encoding the rules in an efficient manner for solving in such a way that partial grid states can be represented and reasoned over.
+
+## Possible Improvements / Extensions
+
+* Add a GUI for generating and solving both nonograms and cross the streams puzzles.
+* Improve recount speed.
+  * Cache a representation of valid row/col states for faster recounts.
+  * There may be helpful shortcuts for counting valid states for more exotic cases (*e.g.*. sequential `?`s, *etc.*)
+  * May require switching to another solver approach (recognizing runs in row/col states and fitting clues to that).
+* Minimize number of validity checks (requires verifying correctness of algorithm).
