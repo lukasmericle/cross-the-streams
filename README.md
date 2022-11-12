@@ -16,6 +16,8 @@ As this implements a dynamic-programming-based tree search, there are certain co
 ## Possible Improvements / Extensions
 
 * Add a GUI for generating and solving both nonograms and cross the streams puzzles.
+* Better initial behavior (avoid unnecessary recounts).
+  * Estimate or calculate number of states for given clue row/col to prioritize solver's traversal.
 * Improve recount speed.
   * Cache a representation of valid row/col states for faster recounts.
   * There may be helpful shortcuts for counting valid states for more exotic cases (*e.g.*. sequential `?`s, *etc.*)
