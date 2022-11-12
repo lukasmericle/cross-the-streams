@@ -95,13 +95,11 @@ end
     all_asks = findall(isa.(cluevec, Asterisk))
 
     # make sure we have the room to check multiple states.
-    # shortcut for leaf case where cellvec may not fit clues.
     n_reqd_cells = minreq_cells(cluevec[all_ints], length(all_qmks))
     # if the clues won't fit into the grid, this branch is invalid.
     (n_reqd_cells > length(cellvec)) && return nothing
-    # if cellvec has length = 0 and cluevec has length > 0,
+    # if cellvec has length = 0 and cluevec has length > 0 but n_reqd_cells == 0,
     # then cluevec contains only Asterisk.
-    # no-op.
     (length(cellvec) === 0) && return VectorStateCounter(0; init="askmissing")
 
     # passed the checks: begin solving sub-problems with recursion.
@@ -157,7 +155,7 @@ end
             if (pos === last_pos_apriori)
                 counter_after = VectorStateCounter(0; init="empty")
             else
-                # continue if mandatory empty cell should be filled
+                # continue if mandatory empty cell is already true
                 istrue(cellvec[r+1]) && continue
                 # else, recurse: count states of everything to the right.
                 counter_after = count_states(cellvec[r+2:end], cluevec[first_int+1:end])
