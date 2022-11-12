@@ -20,4 +20,5 @@ As this implements a dynamic-programming-based tree search, there are certain co
   * Cache a representation of valid row/col states for faster recounts.
   * There may be helpful shortcuts for counting valid states for more exotic cases (*e.g.*. sequential `?`s, *etc.*)
   * May require switching to another solver approach (recognizing runs in row/col states and fitting clues to that).
+* Improve cross the streams solution generation.
 * Minimize number of validity checks (requires verifying correctness of algorithm).
