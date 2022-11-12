@@ -1,4 +1,4 @@
-export generate_puzzle
+export CrossTheStreamsPuzzle
 
 # generating puzzles
 ## judging difficulty by:
@@ -7,16 +7,17 @@ export generate_puzzle
 ## * some way to compute or approximate the "entropy" of the solution path
 ## or just tune a stochastic algorithm to produce decent results, and curate by hand
 
-@views function mutate!(cvec::T; ps::Vector{Float64}=ones(4)) where T <: AbstractClueVector
-    fn = sample([int2qmk!, num2ask!, merge_num_ask!, insert_ask!], Weights(ps))
+
+# mutate puzzle clues.
+@views function mutate!(cvec::T; ps::Vector{Float64}=ones(2)) where {T<:AbstractClueVector}
+    """Randomize (mutate) puzzle row."""
+    fn = sample([int2qmk!, nums2ask!], Weights(ps))
     fn(cvec)
     clean!(cvec)
 end
 
-@views function clean!(cvec::T) where T <: AbstractClueVector
-    """
-    Eliminate duplicate Asterisks.
-    """
+@views function clean!(cvec::T) where {T<:AbstractClueVector}
+    """Eliminate duplicate Asterisks."""
     all_asks = findall(isa.(cvec, Asterisk))
     (length(all_asks) < 2) && return
     dist_to_next_ask = all_asks[2:end] .- all_asks[1:end-1]
@@ -25,70 +26,59 @@ end
     deleteat!(cvec, duplicates)
 end
 
-@views function int2qmk!(cvec::T) where T <: AbstractClueVector
+@views function int2qmk!(cvec::T) where {T<:AbstractClueVector}
+    """Replaces an int with a question mark."""
     all_ints = findall(isa.(cvec, Int))
     (length(all_ints) === 0) && return
     cvec[rand(all_ints)] = QuestionMark()
 end
 
-@views function num2ask!(cvec::T) where T <: AbstractClueVector
-    (length(cvec) === 0) && return
-    cvec[rand(1:length(cvec))] = Asterisk()
-end
-
-@views function merge_num_ask!(cvec::T) where T <: AbstractClueVector
-    (length(cvec) < 2) && return
-    all_asks = findall(isa.(cvec, Asterisk))
-    (length(all_asks) === 0) && return
-    merge_candidates = OneDCoord[]
-    while (length(merge_candidates) === 0)
-        this_ask = OneDCoord(rand(all_asks))
-        merge_candidates = filter(x -> inbounds(cvec, x),
-                                  broadcast(vnn -> vnn + this_ask, VON_NEUMANN_NEIGHBORHOOD_1D))
+@views function nums2ask!(cvec::T) where {T<:AbstractClueVector}
+    """Replaces anywhere from 0 to all of the clues with an asterisk."""
+    if ((length(cvec) === 0) && rand() < 0.5)
+        push!(cvec, Asterisk())
+        return
     end
-    deleteat!(cvec, rand(merge_candidates))
+    replace_len = rand(0:length(cvec))
+    replace_loc = rand(1:(length(cvec)-(replace_len-1)))
+    deleteat!(cvec, replace_loc:(replace_loc+(replace_len-1)))
+    insert!(cvec, replace_loc, Asterisk())
 end
 
-@views insert_ask!(cvec::T) where T <: AbstractClueVector = insert!(cvec, rand(1:(length(cvec)+1)), Asterisk())
-
-@views function get_puzzle_col(svec::T) where T <: OneDSolutionCellArray
-    clues = Clue[]
-    clue = 0
-    for cell=svec
-        if cell
-            clue += 1
-        elseif (clue > 0)
-            push!(clues, clue)
-            clue = 0
-        end
+function mutate!(puzzle::P) where {P<:Puzzle}
+    """Mutate a random row or col in a puzzle."""
+    if rand(Bool)
+        i = rand(1:size(puzzle, 1))
+        mutate!(rows(puzzle)[i])
+        return ('R', i)
+    else
+        j = rand(1:size(puzzle, 2))
+        mutate!(cols(puzzle)[j])
+        return ('C', j)
     end
-    (clue > 0) && push!(clues, clue)
-    clues
 end
 
-@views get_puzzle_cols(smat::T) where T <: TwoDSolutionCellArray = map(get_puzzle_col, eachcol(smat))
-@views get_puzzle_rows(smat::T) where T <: TwoDSolutionCellArray = map(get_puzzle_col, eachrow(smat))
 
-Puzzle(smat::T) where T <: TwoDSolutionCellArray = Puzzle(get_puzzle_rows(smat), get_puzzle_cols(smat))
-
-function generate_puzzle(smat::T; difficulty::S=0.0) where {T <: TwoDSolutionCellArray, S <: AbstractFloat}
-    puzzle = Puzzle(smat)
+# generate puzzles.
+function CrossTheStreamsPuzzle(smat::T, difficulty::S) where {T<:TwoDSolutionCellArray,S<:AbstractFloat}
+    """Generate a puzzle from an existing solution with optional mutation."""
+    puzzle = CrossTheStreamsPuzzle(smat)
+    (difficulty <= 0) && return puzzle
     counter = MatrixStateCounter(puzzle)
-    initial_num_states = convert(BigFloat, num_states(counter))
+    initn = convert(BigFloat, n(counter))
     dummy_row = convert(CellVector, fill(missing, size(puzzle, 2)))
     dummy_col = convert(CellVector, fill(missing, size(puzzle, 1)))
-    while ((convert(BigFloat, num_states(counter)) / initial_num_states) < exp(difficulty))
-        if rand(Bool)
-            i = rand(1:size(puzzle, 1))
-            mutate!(rows(puzzle)[i])
+    while ((convert(BigFloat, n(counter)) / initn) < exp(difficulty))
+        rc = mutate!(puzzle)
+        if rc[1] === 'R'
+            i = rc[2]
             recount!(rows(counter)[i], dummy_row, rows(puzzle)[i])
-        else
-            j = rand(1:size(puzzle, 2))
-            mutate!(cols(puzzle)[j])
+        elseif rc[1] === 'C'
+            j = rc[2]
             recount!(cols(counter)[j], dummy_col, cols(puzzle)[j])
+        else
+            error("rowcol must either refer to row ('R') or col ('C')")
         end
     end
     puzzle
 end
-generate_puzzle(n::Int, m::Int; difficulty::T=1.0) where T <: AbstractFloat = generate_puzzle(generate_solution(n, m), difficulty=difficulty)
-generate_puzzle(n::Int; difficulty::T=1.0) where T <: AbstractFloat = generate_puzzle(n, n, difficulty=difficulty)

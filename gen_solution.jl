@@ -1,20 +1,26 @@
-export generate_solution
+export generate_cross_the_streams_solution
 
-function construct_gaussian_kernel(k::T) where T <: Real
+
+function construct_gaussian_kernel(k::T) where {T<:Real}
+    """Compute gaussian kernel with diameter `k` on 2D discrete lattice."""
     k = max(3, trunc(Int8, k))
     iseven(k) && (k -= 1)  # k should be odd so that the kernel is always centered on a cell
-    v = float.(map(x -> binomial(k-1,x), 0:(k-1)))
+    v = float.(map(x -> binomial(k - 1, x), 0:(k-1)))
     kernel = v * v'  # outer product
     kernel ./= sum(kernel)
 end
 
-@views function convolve(smat::TC, kernel::Matrix{TK}, ij::TwoDCoord) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
+@views function convolve(smat::TC, kernel::Matrix{TK}, ij::TwoDCoord) where {TC<:TwoDSolutionCellArray,TK<:AbstractFloat}
+    """
+    Compute convolution of kernel with smat at location ij.
+    Used as a proxy for "local density of `true`s" to guide solution generation.
+    """
     c = 0.0
     let k = size(kernel, 1), kk = trunc(Int, (k - 1) / 2), (i, j) = Tuple(ij)
-        for u=1:k
+        for u = 1:k
             ii = i + (u - 1) - kk
             !inbounds(smat, ii, 1) && continue
-            for v=1:k
+            for v = 1:k
                 jj = j + (v - 1) - kk
                 !inbounds(smat, jj, 2) && continue
                 smat[ii, jj] && (c += kernel[u, v])
@@ -27,11 +33,11 @@ end
 GOLDEN_RATIO = (sqrt(5) + 1) / 2
 BASE_COEFF = 1 / GOLDEN_RATIO
 
-KERNEL_WIDTH_COEFF = BASE_COEFF ^ (1 - log1p(666e-4))
-make_kernel(smat::T) where T <: TwoDSolutionCellArray = construct_gaussian_kernel(sqrt(prod(size(smat))) ^ KERNEL_WIDTH_COEFF)
+KERNEL_WIDTH_COEFF = BASE_COEFF^(1 - log1p(666e-4))
+make_kernel(smat::T) where {T<:TwoDSolutionCellArray} = construct_gaussian_kernel(sqrt(prod(size(smat)))^KERNEL_WIDTH_COEFF)
 
-NEXT_SITE_COEFF = BASE_COEFF ^ (1 + log(666e-2))
-@views function choose_next_site(smat::TC, kernel::Matrix{TK}, ijs::Vector{TwoDCoord}) where {TC <: TwoDSolutionCellArray, TK <: AbstractFloat}
+NEXT_SITE_COEFF = BASE_COEFF^(1 + log(666e-2))
+@views function choose_next_site(smat::TC, kernel::Matrix{TK}, ijs::Vector{TwoDCoord}) where {TC<:TwoDSolutionCellArray,TK<:AbstractFloat}
     """
     Chooses the next site based on weights derived from
     the local density of true cells in the current state.
@@ -39,15 +45,24 @@ NEXT_SITE_COEFF = BASE_COEFF ^ (1 + log(666e-2))
     sample(1:length(ijs), Weights(1 ./ (map(ij -> convolve(smat, kernel, ij), ijs) .^ NEXT_SITE_COEFF)))
 end
 
-RAND_SKIP_COEFF = BASE_COEFF ^ (1 - log1p(55555e-6))
-function random_skip(smat::T, ij::TwoDCoord) where T <: TwoDSolutionCellArray
+RAND_SKIP_COEFF = BASE_COEFF^(1 - log1p(55555e-6))
+function random_skip(smat::T, ij::TwoDCoord) where {T<:TwoDSolutionCellArray}
+    """
+    Choose whether to skip filling this location based on kernel density.
+    """
     kernel = construct_gaussian_kernel(sqrt(prod(size(smat))))
     w = convolve(smat, kernel, ij)
-    (rand() < (w ^ RAND_SKIP_COEFF))
+    (rand() < (w^RAND_SKIP_COEFF))
 end
 
-function generate_solution(n::Int, m::Int)
+function generate_cross_the_streams_solution(n::Int, m::Int)
+    """
+    Generate a valid Cross The Streams solution.
+    Basically a modified flood-fill algorithm,
+    enforcing the appropriate constraints.
+    """
     smat = fill(false, n, m)
+    # initialize uniform random
     ijs = [TwoDCoord(rand(1:n), rand(1:m))]
     kernel = make_kernel(smat)
     while (length(ijs) > 0)
@@ -63,4 +78,3 @@ function generate_solution(n::Int, m::Int)
     end
     smat
 end
-generate_solution(n::Int) = generate_solution(n, n)
